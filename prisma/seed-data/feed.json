@@ -1,0 +1,472 @@
+{
+  "colors": [
+    {
+      "name": "Black",
+      "value": "#000000"
+    },
+    {
+      "name": "LightBlue",
+      "value": "#D4E5F5"
+    },
+    {
+      "name": "Blue",
+      "value": "#286FB2"
+    },
+    {
+      "name": "Green",
+      "value": "#86F3B9"
+    },
+    {
+      "name": "Red",
+      "value": "#F38686"
+    }
+  ],
+  "feed": [
+    {
+      "store": "Kutuku Store",
+      "description": "24% off shipping today on bag purchases",
+      "image": "https://img.freepik.com/fotos-gratis/conceito-de-compras-fecha-retrato-jovem-linda-e-atraente-garota-ruiva-sorrindo-olhando-para-a-camera_1258-118763.jpg?semt=ais_hybrid&w=740"
+    },
+    {
+      "store": "SagaFalabella",
+      "description": "15% off shipping today on all clothes",
+      "image": "https://img.freepik.com/free-photo/holiday-promos-real-estate-concept-cute-redhead-woman-santa-hat-sweater-showing-paper-hou_1258-157379.jpg"
+    },
+    {
+      "store": "Ripley",
+      "description": "20% off shipping today on all Electronics",
+      "image": "https://img.freepik.com/premium-photo/portrait-young-woman-standing-against-blue-background_1048944-27466272.jpg?semt=ais_hybrid&w=740"
+    }
+  ],
+  "categories": [
+    {
+      "name": "New Arrivals",
+      "subtitle": "208 Products",
+      "image": "https://justintime.in/cdn/shop/files/Top_10_Smartwatches_for_Men__2024_May_Desktop_f5cb9a2d-a39b-489c-a22e-34261a0c356a_1500x.png?v=1717665738",
+      "position": "left",
+      "products": [
+        {
+          "name": "Smartwatch X1",
+          "description": "Un smartwatch con pantalla AMOLED y monitor de ritmo cardíaco.",
+          "price": 199.99,
+          "image": "https://http2.mlstatic.com/D_NQ_NP_763222-MLU74222783373_012024-O.webp",
+          "like": false,
+          "store": "Alpha Store",
+          "searched": "1.2k Search today",
+          "status": "New",
+          "colors": [
+            "Black",
+            "Blue",
+            "Green"
+          ],
+          "location": [
+            "San Diego"
+          ]
+        },
+        {
+          "name": "Headphones Pro",
+          "description": "Auriculares con cancelación de ruido activa y sonido Hi-Fi.",
+          "price": 149.50,
+          "image": "https://http2.mlstatic.com/D_NQ_NP_819285-MPE72549492487_102023-O.webp",
+          "like": false,
+          "store": "Beta Boutique",
+          "searched": "900 Search today",
+          "status": "Hot",
+          "colors": [
+            "Black",
+            "LightBlue",
+            "Red",
+            "Green",
+            "Blue"
+          ],
+          "location": [
+            "New York",
+            "Amsterdam",
+            "San Diego"
+          ]
+        },
+        {
+          "name": "4K Drone",
+          "description": "Dron compacto con cámara 4K y estabilización gimbal.",
+          "price": 349.00,
+          "image": "https://5.imimg.com/data5/SELLER/Default/2024/10/461345605/ZE/QF/NM/84394228/izi-spectra-combo-drone-with-camera-4k-hdr-cinematic-1-cmos-sensor-500x500.png",
+          "like": false,
+          "store": "Gamma Goods",
+          "searched": "700 Search today",
+          "status": "Normal",
+          "colors": [
+            "Black",
+            "Green",
+            "Blue"
+          ],
+          "location": [
+            "Amsterdam"
+          ]
+        },
+        {
+          "name": "Wireless Charger",
+          "description": "Base de carga inalámbrica rápida compatible con Qi.",
+          "price": 29.99,
+          "image": "https://m.media-amazon.com/images/I/51pbKzrAd9L.jpg",
+          "like": false,
+          "store": "Delta Deals",
+          "searched": "1.0k Search today",
+          "status": "Normal",
+          "colors": [
+            "Black",
+            "LightBlue",
+            "Red",
+            "Green",
+            "Blue"
+          ],
+          "location": [
+            "New York"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Clothes",
+      "subtitle": "85 Products",
+      "image": "https://t4.ftcdn.net/jpg/03/13/65/17/360_F_313651795_OUrd7HrFYuxo9LXuuREFvRyIPeEfVSLj.jpg",
+      "position": "right",
+      "products": [
+        {
+          "name": "Denim Jacket",
+          "description": "Chaqueta vaquera clásica con corte ajustado.",
+          "price": 89.90,
+          "image": "https://lsco.scene7.com/is/image/lsco/A06320000-front-pdp?fmt=jpeg&qlt=70&resMode=sharp2&fit=crop,1&op_usm=0.6,0.6,8&wid=880&hei=880",
+          "like": false,
+          "store": "Alpha Store",
+          "searched": "1.3k Search today",
+          "status": "Popular",
+          "colors": [
+            "Blue",
+            "LightBlue",
+            "Black"
+          ],
+          "location": [
+            "San Diego",
+            "New York",
+            "Amsterdam"
+          ]
+        },
+        {
+          "name": "Graphic T-Shirt",
+          "description": "Camiseta de algodón con estampado único.",
+          "price": 24.99,
+          "image": "https://m.media-amazon.com/images/I/61ETIupdWLL._AC_UY1000_.jpg",
+          "like": false,
+          "store": "Epsilon Emporium",
+          "searched": "800 Search today",
+          "status": "Normal",
+          "colors": [
+            "Red",
+            "Black",
+            "Green",
+            "Blue",
+            "LightBlue"
+          ],
+          "location": [
+            "New York"
+          ]
+        },
+        {
+          "name": "Leather Belt",
+          "description": "Cinturón de piel genuina con hebilla metálica.",
+          "price": 45.00,
+          "image": "https://redhorns.in/cdn/shop/products/GB10AntBrown-1.jpg?v=1669027446",
+          "like": false,
+          "store": "Beta Boutique",
+          "searched": "500 Search today",
+          "status": "Normal",
+          "colors": [
+            "Black",
+            "Brown",
+            "Green"
+          ],
+          "location": [
+            "Amsterdam"
+          ]
+        },
+        {
+          "name": "Chino Pants",
+          "description": "Pantalones chinos slim fit, muy cómodos.",
+          "price": 59.99,
+          "image": "https://media.centrepointstores.com/i/centrepoint/5015316-HQ150618-SPWIN24270224_01-2100.jpg?fmt=auto&",
+          "like": false,
+          "store": "Gamma Goods",
+          "searched": "650 Search today",
+          "status": "Normal",
+          "colors": [
+            "Blue",
+            "Green",
+            "Red"
+          ],
+          "location": [
+            "San Diego",
+            "New York",
+            "Amsterdam"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Bags",
+      "subtitle": "215 Products",
+      "image": "https://www.shutterstock.com/image-photo/backpack-different-colorful-stationery-on-600nw-1710645322.jpg",
+      "position": "left",
+      "products": [
+        {
+          "name": "Backpack Traveler",
+          "description": "Mochila resistente al agua con múltiples compartimentos.",
+          "price": 79.95,
+          "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS5vKiItM4pWBpau6a6xyI4y0iJ2xWfDQ8glDiWPDO8FUCxrBicp8GxGVjjThw01yzF3_4&usqp=CAU",
+          "like": false,
+          "store": "Delta Deals",
+          "searched": "900 Search today",
+          "status": "Hot",
+          "colors": [
+            "Black",
+            "Green",
+            "Blue",
+            "LightBlue",
+            "Red"
+          ],
+          "location": [
+            "San Diego"
+          ]
+        },
+        {
+          "name": "Leather Tote",
+          "description": "Bolso tote de piel suave, ideal para diario.",
+          "price": 120.00,
+          "image": "https://i.pinimg.com/474x/4e/25/6b/4e256b6e2b3c7a381c5c6526b319bf9f.jpg",
+          "like": true,
+          "store": "Epsilon Emporium",
+          "searched": "550 Search today",
+          "status": "Normal",
+          "colors": [
+            "Black",
+            "Red",
+            "Blue"
+          ],
+          "location": [
+            "New York",
+            "Amsterdam",
+            "San Diego"
+          ]
+        },
+        {
+          "name": "Crossbody Bag",
+          "description": "Bolso bandolera compacto con correa ajustable.",
+          "price": 49.99,
+          "image": "https://m-commerce.countryroad.com/productimages_display/TRMEDIUM/1/121637_568518_378212.jpg",
+          "like": false,
+          "store": "Alpha Store",
+          "searched": "700 Search today",
+          "status": "Normal",
+          "colors": [
+            "LightBlue",
+            "Blue",
+            "Green",
+            "Red",
+            "Black"
+          ],
+          "location": [
+            "Amsterdam"
+          ]
+        },
+        {
+          "name": "Duffel Bag",
+          "description": "Bolsa de viaje tipo duffel, espaciosa y duradera.",
+          "price": 99.99,
+          "image": "https://m-commerce.mimco-accessories.com/productimages_display/zoom/2/24125_39994_88982.jpg",
+          "like": false,
+          "store": "Beta Boutique",
+          "searched": "620 Search today",
+          "status": "Normal",
+          "colors": [
+            "Black",
+            "Blue",
+            "LightBlue"
+          ],
+          "location": [
+            "New York"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Shoes",
+      "subtitle": "97 Products",
+      "image": "https://img.freepik.com/premium-photo/pair-yellow-sneakers-flower-buds-yellow-background-spring-summer-fashion-concept_1048944-19842213.jpg?semt=ais_hybrid&w=740",
+      "position": "right",
+      "products": [
+        {
+          "name": "Running Sneakers",
+          "description": "Zapatillas ligeras con amortiguación Gel.",
+          "price": 110.00,
+          "image": "https://www.nike.sa/dw/image/v2/BDVB_PRD/on/demandware.static/-/Sites-akeneo-master-catalog/default/dw9d092259/nk/556/8/5/c/4/a/55685c4a_d8d3_4140_a0ca_27df2220a9e3.jpg?sw=700&sh=700&sm=fit&q=100&strip=false",
+          "like": false,
+          "store": "Gamma Goods",
+          "searched": "1.1k Search today",
+          "status": "New",
+          "colors": [
+            "Black",
+            "Green",
+            "Red"
+          ],
+          "location": [
+            "San Diego"
+          ]
+        },
+        {
+          "name": "Leather Boots",
+          "description": "Botas de cuero con suela antideslizante.",
+          "price": 139.99,
+          "image": "https://assets.ajio.com/medias/sys_master/root/20230421/Gzob/64428607711cf97ba73d2bb0/-473Wx593H-466083260-tan-MODEL8.jpg",
+          "like": false,
+          "store": "Delta Deals",
+          "searched": "800 Search today",
+          "status": "Popular",
+          "colors": [
+            "Black",
+            "Blue",
+            "LightBlue",
+            "Green"
+          ],
+          "location": [
+            "New York",
+            "Amsterdam",
+            "San Diego"
+          ]
+        },
+        {
+          "name": "Slip-On Loafers",
+          "description": "Mocasines cómodos para uso casual.",
+          "price": 69.50,
+          "image": "https://i.ebayimg.com/images/g/2a4AAOSwGYZmciIn/s-l1200.jpg",
+          "like": false,
+          "store": "Epsilon Emporium",
+          "searched": "550 Search today",
+          "status": "Normal",
+          "colors": [
+            "Blue",
+            "LightBlue",
+            "Red",
+            "Green",
+            "Black"
+          ],
+          "location": [
+            "Amsterdam"
+          ]
+        },
+        {
+          "name": "Canvas Sneakers",
+          "description": "Zapatillas de lona clásicas y versátiles.",
+          "price": 49.99,
+          "image": "https://images-cdn.ubuy.co.in/633af87aeba0d54e2d4d4787-women-shoes-sneakers-girls-canvas-shoes.jpg",
+          "like": false,
+          "store": "Alpha Store",
+          "searched": "700 Search today",
+          "status": "Normal",
+          "colors": [
+            "Red",
+            "Black",
+            "LightBlue"
+          ],
+          "location": [
+            "New York"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Electronics",
+      "subtitle": "341 Products",
+      "image": "https://example.com/images/electronics.png",
+      "position": "left",
+      "products": [
+        {
+          "name": "Bluetooth Speaker",
+          "description": "Altavoz portátil con sonido estéreo 360°.",
+          "price": 59.99,
+          "image": "https://www.dimprice.co.uk/image/cache/catalog/products_2022/1-1-800x800.jpg",
+          "like": false,
+          "store": "Beta Boutique",
+          "searched": "1.0k Search today",
+          "status": "Hot",
+          "colors": [
+            "Black",
+            "Green",
+            "Blue"
+          ],
+          "location": [
+            "San Diego"
+          ]
+        },
+        {
+          "name": "Portable SSD 1TB",
+          "description": "Disco duro sólido USB-C de alta velocidad.",
+          "price": 129.99,
+          "image": "https://cdn.panacompu.com/cdn-img/pv/sd-1.jpg",
+          "like": false,
+          "store": "Gamma Goods",
+          "searched": "850 Search today",
+          "status": "Hot",
+          "colors": [
+            "Black",
+            "Red",
+            "LightBlue",
+            "Green",
+            "Blue"
+          ],
+          "location": [
+            "New York",
+            "Amsterdam",
+            "San Diego"
+          ]
+        },
+        {
+          "name": "Wireless Mouse",
+          "description": "Ratón ergonómico con sensor óptico 16000 DPI.",
+          "price": 39.99,
+          "image": "https://thotcomputacion.com.uy/wp-content/uploads/2023/05/Logitech2520PRO2520Gaming_175332_146b72173b84431fa325b0734554df7b.webp",
+          "like": true,
+          "store": "Delta Deals",
+          "searched": "650 Search today",
+          "status": "Normal",
+          "colors": [
+            "Black",
+            "Blue",
+            "LightBlue"
+          ],
+          "location": [
+            "Amsterdam"
+          ]
+        },
+        {
+          "name": "Gaming Keyboard",
+          "description": "Teclado mecánico RGB con switches táctiles.",
+          "price": 89.99,
+          "image": "https://techspertz.co.za/wp-content/uploads/2021/12/T-TGK306_wr_06.jpg",
+          "like": false,
+          "store": "Epsilon Emporium",
+          "searched": "780 Search today",
+          "status": "Normal",
+          "colors": [
+            "Black",
+            "Green",
+            "Red",
+            "Blue",
+            "LightBlue"
+          ],
+          "location": [
+            "New York"
+          ]
+        }
+      ]
+    }
+  ]
+}

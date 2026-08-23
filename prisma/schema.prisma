@@ -1,0 +1,182 @@
+// Ver docs/plan-marketplace-backend.md §4 (demoCompose) para el diagrama ER y la justificación
+// de cada decisión de modelado.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ProductStatus {
+  Hot
+  New
+  Normal
+  Popular
+}
+
+enum OrderStatus {
+  pending_payment
+  processing
+  shipped
+  delivered
+}
+
+enum StockAlertType {
+  back_in_stock
+  price_drop
+}
+
+/**
+ * Catálogo de valores válidos de color (§7 del plan) — no se referencia por FK desde `ProductVariant.color`, se valida en el DTO.
+ */
+model Color {
+  id    String @id @default(uuid())
+  name  String @unique
+  value String
+
+  @@map("colors")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  favorites   Favorite[]
+  orders      Order[]
+  reviews     Review[]
+  stockAlerts StockAlert[]
+
+  @@map("users")
+}
+
+model Category {
+  id       String  @id @default(uuid())
+  name     String  @unique
+  subtitle String?
+  image    String?
+
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id          String        @id @default(uuid())
+  categoryId  String
+  name        String
+  description String
+  price       Decimal       @db.Decimal(10, 2)
+  store       String
+  status      ProductStatus @default(Normal)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  category    Category         @relation(fields: [categoryId], references: [id])
+  variants    ProductVariant[]
+  reviews     Review[]
+  favorites   Favorite[]
+  stockAlerts StockAlert[]
+
+  @@unique([categoryId, name])
+  @@index([categoryId])
+  @@map("products")
+}
+
+model ProductVariant {
+  id        String @id @default(uuid())
+  productId String
+  color     String
+  sku       String @unique
+  stock     Int    @default(0)
+
+  product    Product     @relation(fields: [productId], references: [id])
+  orderItems OrderItem[]
+
+  @@index([productId])
+  @@map("product_variants")
+}
+
+model Order {
+  id           String      @id @default(uuid())
+  userId       String
+  status       OrderStatus @default(pending_payment)
+  total        Decimal     @db.Decimal(10, 2)
+  shippingCity String
+  etaDays      Int
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  user  User        @relation(fields: [userId], references: [id])
+  items OrderItem[]
+
+  @@index([userId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  variantId String
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+
+  order   Order          @relation(fields: [orderId], references: [id])
+  variant ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@index([orderId])
+  @@index([variantId])
+  @@map("order_items")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  productId String
+  userId    String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([productId, userId])
+  @@index([productId])
+  @@map("reviews")
+}
+
+model Favorite {
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@id([userId, productId])
+  @@map("favorites")
+}
+
+model StockAlert {
+  id        String         @id @default(uuid())
+  userId    String
+  productId String
+  type      StockAlertType
+  notified  Boolean        @default(false)
+  createdAt DateTime       @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([userId])
+  @@index([productId])
+  @@map("stock_alerts")
+}
