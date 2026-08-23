@@ -39,20 +39,28 @@ export class AuthService {
       name: dto.name,
     });
 
-    return this.signToken(user.id, user.email);
+    return this.signToken(user.id, user.email, user.role);
   }
 
   async login(dto: LoginDto): Promise<AuthResult> {
     const user = await this.usersService.findByEmail(dto.email);
-    if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
+    if (
+      !user ||
+      !user.active ||
+      !(await bcrypt.compare(dto.password, user.passwordHash))
+    ) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    return this.signToken(user.id, user.email);
+    return this.signToken(user.id, user.email, user.role);
   }
 
-  private async signToken(sub: string, email: string): Promise<AuthResult> {
-    const payload: JwtPayload = { sub, email };
+  private async signToken(
+    sub: string,
+    email: string,
+    role: JwtPayload['role'],
+  ): Promise<AuthResult> {
+    const payload: JwtPayload = { sub, email, role };
     const accessToken = await this.jwtService.signAsync(payload, {
       expiresIn: this.configService.get('jwt.expiresIn', { infer: true }),
     });

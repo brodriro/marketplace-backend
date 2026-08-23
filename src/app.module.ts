@@ -2,9 +2,11 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { AdminModule } from './admin/admin.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
+import { BannersModule } from './banners/banners.module';
 import { CategoriesModule } from './categories/categories.module';
 import { configuration, validateEnv } from './config';
 import { FavoritesModule } from './favorites/favorites.module';
@@ -34,6 +36,8 @@ import { UsersModule } from './users/users.module';
     ReviewsModule,
     OrdersModule,
     NotificationsModule,
+    BannersModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

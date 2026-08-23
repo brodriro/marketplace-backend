@@ -7,5 +7,6 @@ import { OrdersService } from './orders.service';
   imports: [JwtAuthModule],
   controllers: [OrdersController],
   providers: [OrdersService],
+  exports: [OrdersService],
 })
 export class OrdersModule {}

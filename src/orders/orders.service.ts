@@ -5,9 +5,20 @@ import {
 } from '@nestjs/common';
 import { OrderStatus } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { AdminOrdersQueryDto } from './dto/admin-orders-query.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
 const DEFAULT_ETA_DAYS = 5;
+/** Nunca incluir `passwordHash` en respuestas admin que traen el `user` de un pedido. */
+const SAFE_USER_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  avatarUrl: true,
+  role: true,
+  active: true,
+} as const;
 const ORDER_STAGES: OrderStatus[] = [
   OrderStatus.pending_payment,
   OrderStatus.processing,
@@ -92,6 +103,74 @@ export class OrdersService {
         },
         include: { items: true },
       });
+    });
+  }
+
+  /** Todos los pedidos, de todos los usuarios — solo para uso admin. */
+  async findAllAdmin(query: AdminOrdersQueryDto) {
+    const { page, pageSize, status } = query;
+    const where = status ? { status } : {};
+    const [orders, total] = await this.prisma.$transaction([
+      this.prisma.order.findMany({
+        where,
+        include: { items: true, user: { select: SAFE_USER_SELECT } },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.order.count({ where }),
+    ]);
+    return { data: orders, page, pageSize, total };
+  }
+
+  /** A diferencia de `findOne`, no valida ownership — admin puede ver cualquier pedido. */
+  async findOneAdmin(id: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: {
+        items: { include: { variant: { include: { product: true } } } },
+        user: { select: SAFE_USER_SELECT },
+      },
+    });
+    if (!order) {
+      throw new NotFoundException('Pedido no encontrado');
+    }
+    return { ...order, timeline: this.buildTimeline(order) };
+  }
+
+  /** Solo permite avanzar de estado (nunca retroceder); tracking se puede setear independientemente. */
+  async updateStatus(id: string, dto: UpdateOrderStatusDto) {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id } });
+      if (!order) {
+        throw new NotFoundException('Pedido no encontrado');
+      }
+
+      if (dto.status) {
+        const currentIndex = ORDER_STAGES.indexOf(order.status);
+        const nextIndex = ORDER_STAGES.indexOf(dto.status);
+        if (nextIndex < currentIndex) {
+          throw new BadRequestException(
+            `No se puede retroceder el estado de ${order.status} a ${dto.status}`,
+          );
+        }
+      }
+
+      const updated = await tx.order.update({
+        where: { id },
+        data: {
+          ...(dto.status ? { status: dto.status } : {}),
+          ...(dto.trackingNumber !== undefined
+            ? { trackingNumber: dto.trackingNumber }
+            : {}),
+          ...(dto.trackingCarrier !== undefined
+            ? { trackingCarrier: dto.trackingCarrier }
+            : {}),
+        },
+        include: { items: true, user: { select: SAFE_USER_SELECT } },
+      });
+
+      return { ...updated, timeline: this.buildTimeline(updated) };
     });
   }
 

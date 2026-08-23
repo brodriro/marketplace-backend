@@ -5,6 +5,7 @@ import { PassportModule } from '@nestjs/passport';
 import { AppConfig } from '../config/configuration';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { JwtStrategy } from './jwt.strategy';
+import { RolesGuard } from './roles.guard';
 
 /**
  * Guard + estrategia JWT, sin depender de `UsersModule` — `AuthModule` (register/login) necesita
@@ -26,7 +27,7 @@ import { JwtStrategy } from './jwt.strategy';
       }),
     }),
   ],
-  providers: [JwtStrategy, JwtAuthGuard],
-  exports: [JwtModule, JwtAuthGuard],
+  providers: [JwtStrategy, JwtAuthGuard, RolesGuard],
+  exports: [JwtModule, JwtAuthGuard, RolesGuard],
 })
 export class JwtAuthModule {}

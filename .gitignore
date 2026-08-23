@@ -47,6 +47,9 @@ lerna-debug.log*
 .temp
 .tmp
 
+# AWS RDS CA bundle (descargado localmente para sslmode=verify-full)
+global-bundle.pem
+
 # Runtime data
 pids
 *.pid

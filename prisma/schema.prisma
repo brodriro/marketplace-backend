@@ -30,6 +30,11 @@ enum StockAlertType {
   price_drop
 }
 
+enum Role {
+  user
+  admin
+}
+
 /**
  * Catálogo de valores válidos de color (§7 del plan) — no se referencia por FK desde `ProductVariant.color`, se valida en el DTO.
  */
@@ -47,6 +52,8 @@ model User {
   passwordHash String
   name         String
   avatarUrl    String?
+  role         Role     @default(user)
+  active       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -108,12 +115,14 @@ model ProductVariant {
 model Order {
   id           String      @id @default(uuid())
   userId       String
-  status       OrderStatus @default(pending_payment)
-  total        Decimal     @db.Decimal(10, 2)
-  shippingCity String
-  etaDays      Int
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  status          OrderStatus @default(pending_payment)
+  total           Decimal     @db.Decimal(10, 2)
+  shippingCity    String
+  etaDays         Int
+  trackingNumber  String?
+  trackingCarrier String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   user  User        @relation(fields: [userId], references: [id])
   items OrderItem[]
@@ -179,4 +188,21 @@ model StockAlert {
   @@index([userId])
   @@index([productId])
   @@map("stock_alerts")
+}
+
+/**
+ * Banners promocionales — sin unique key porque una imagen puede reusarse entre campañas (ver
+ * prisma/seed.ts, que por eso usa find-before-create en vez de upsert).
+ */
+model Banner {
+  id          String   @id @default(uuid())
+  store       String
+  description String
+  image       String
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("banners")
 }

@@ -12,7 +12,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { JwtPayload } from '../auth/jwt-payload.type';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateStockAlertDto } from './dto/create-stock-alert.dto';
-import { PaginationQueryDto } from './dto/pagination-query.dto';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { SearchProductsQueryDto } from './dto/search-products-query.dto';
 import { ProductsService } from './products.service';
 

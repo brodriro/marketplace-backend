@@ -8,5 +8,6 @@ import { ProductsService } from './products.service';
   imports: [JwtAuthModule, NotificationsModule],
   controllers: [ProductsController],
   providers: [ProductsService],
+  exports: [ProductsService],
 })
 export class ProductsModule {}

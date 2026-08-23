@@ -3,7 +3,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
-import { OrderStatus, PrismaClient, type User } from '../src/generated/prisma/client';
+import {
+  OrderStatus,
+  PrismaClient,
+  Role,
+  type User,
+} from '../src/generated/prisma/client';
 
 const SALT_ROUNDS = 10;
 const FIXED_ORDER_ID = '00000000-0000-0000-0000-000000000001';
@@ -40,8 +45,15 @@ interface FeedCategory {
   products: FeedProduct[];
 }
 
+interface FeedBanner {
+  store: string;
+  description: string;
+  image: string;
+}
+
 interface FeedData {
   colors: { name: string; value: string }[];
+  feed: FeedBanner[];
   categories: FeedCategory[];
 }
 
@@ -125,6 +137,26 @@ async function main(): Promise<void> {
     }
   }
 
+  console.log(`Seeding ${feed.feed.length} banners...`);
+  // `Banner` no tiene unique key (una imagen puede reusarse entre campañas) — find-before-create
+  // en vez de upsert, a diferencia del resto del seed.
+  for (let i = 0; i < feed.feed.length; i++) {
+    const banner = feed.feed[i];
+    const existing = await prisma.banner.findFirst({
+      where: { image: banner.image },
+    });
+    if (!existing) {
+      await prisma.banner.create({
+        data: {
+          store: banner.store,
+          description: banner.description,
+          image: banner.image,
+          sortOrder: i,
+        },
+      });
+    }
+  }
+
   const demoEmail = process.env.SEED_DEMO_EMAIL ?? 'demo@marketplace.dev';
   const demoPassword = process.env.SEED_DEMO_PASSWORD ?? 'demo12345';
   console.log(`Seeding demo user (${demoEmail})...`);
@@ -134,6 +166,20 @@ async function main(): Promise<void> {
       email: demoEmail,
       name: 'Usuario Demo',
       passwordHash: await bcrypt.hash(demoPassword, SALT_ROUNDS),
+    },
+    update: {},
+  });
+
+  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@marketplace.dev';
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'admin12345';
+  console.log(`Seeding admin user (${adminEmail})...`);
+  await prisma.user.upsert({
+    where: { email: adminEmail },
+    create: {
+      email: adminEmail,
+      name: 'Admin',
+      role: Role.admin,
+      passwordHash: await bcrypt.hash(adminPassword, SALT_ROUNDS),
     },
     update: {},
   });

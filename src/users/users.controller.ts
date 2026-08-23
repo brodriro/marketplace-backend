@@ -15,7 +15,6 @@ export class UsersController {
     if (!user) {
       throw new NotFoundException('Usuario no encontrado');
     }
-    const { passwordHash: _passwordHash, ...safeUser } = user;
-    return safeUser;
+    return this.usersService.toSafeUser(user);
   }
 }
