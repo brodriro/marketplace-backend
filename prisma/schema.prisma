@@ -84,6 +84,7 @@ model Product {
   price       Decimal       @db.Decimal(10, 2)
   store       String
   status      ProductStatus @default(Normal)
+  visible     Boolean       @default(true)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -99,11 +100,12 @@ model Product {
 }
 
 model ProductVariant {
-  id        String @id @default(uuid())
+  id        String  @id @default(uuid())
   productId String
   color     String
-  sku       String @unique
-  stock     Int    @default(0)
+  sku       String  @unique
+  stock     Int     @default(0)
+  visible   Boolean @default(true)
 
   product    Product     @relation(fields: [productId], references: [id])
   orderItems OrderItem[]
@@ -193,6 +195,9 @@ model StockAlert {
 /**
  * Banners promocionales — sin unique key porque una imagen puede reusarse entre campañas (ver
  * prisma/seed.ts, que por eso usa find-before-create en vez de upsert).
+ * `active` y `visible` son independientes: `active` lo controla el admin (pausar/reactivar sin
+ * perder el registro); `visible` es el borrado lógico (nunca se hace DELETE físico, ver
+ * BannersService.remove) y no se expone para editar desde la UI.
  */
 model Banner {
   id          String   @id @default(uuid())
@@ -200,6 +205,7 @@ model Banner {
   description String
   image       String
   active      Boolean  @default(true)
+  visible     Boolean  @default(true)
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

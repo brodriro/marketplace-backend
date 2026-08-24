@@ -24,6 +24,12 @@ Authorization: Bearer <accessToken>
 El token se obtiene de `POST /auth/register` o `POST /auth/login` y no tiene refresh — cuando
 vence (`JWT_EXPIRES_IN`, default `1d`), hay que volver a loguear.
 
+El payload del JWT incluye `sub` (userId), `email` y `role` (`user | admin`) — este último no
+necesita ser decodificado por clientes normales, pero los endpoints marcados 🔒🛡️ (admin) lo
+exigen: además de un token válido, requieren `role: admin`, si no devuelven `403`. Una cuenta con
+`active: false` no puede loguearse (`401` en `POST /auth/login`, mismo mensaje genérico que una
+contraseña incorrecta, para no filtrar el estado de la cuenta).
+
 ## Formato de error
 
 Formato estándar de Nest (`ValidationPipe`/`HttpException`):
@@ -99,6 +105,8 @@ Errores: `400` (validación), `401` (credenciales inválidas).
   "email": "string",
   "name": "string",
   "avatarUrl": "string | null",
+  "role": "user | admin",
+  "active": true,
   "createdAt": "ISO-8601",
   "updatedAt": "ISO-8601"
 }
@@ -274,6 +282,8 @@ no existe), `409` (el usuario ya dejó una reseña para este producto — 1 por 
   "total": "349.00",
   "shippingCity": "string",
   "etaDays": 5,
+  "trackingNumber": "string | null",
+  "trackingCarrier": "string | null",
   "createdAt": "ISO-8601",
   "updatedAt": "ISO-8601",
   "items": [
@@ -362,6 +372,83 @@ Marca `notified: true`. `200`: el `StockAlert` actualizado (sin `product` anidad
 
 ---
 
+## Banners
+
+### `GET /banners`
+
+Público, sin auth. Banners promocionales activos, ordenados por `sortOrder` ascendente. `200`:
+array de:
+
+```json
+{
+  "id": "uuid",
+  "store": "string",
+  "description": "string",
+  "image": "string",
+  "active": true,
+  "sortOrder": 0,
+  "createdAt": "ISO-8601",
+  "updatedAt": "ISO-8601"
+}
+```
+
+---
+
+## Admin 🔒🛡️
+
+Todos los endpoints de esta sección requieren JWT válido **y** `role: admin` (`RolesGuard`) —
+`401` sin token, `403` con token válido pero rol `user`. Pensados para el dashboard de
+administración (`admin/`), no para el cliente Android.
+
+**Borrado lógico**: todo `DELETE` de esta sección (productos, variantes, banners) nunca hace un
+`DELETE` físico en la base — internamente es un `UPDATE` que apaga `visible` (`true → false`).
+El registro deja de aparecer en cualquier listado (público y admin) pero sigue existiendo en la
+DB, así que pedidos ya creados que referencian ese producto/variante no se ven afectados. No hay
+endpoint para revertirlo (restaurar `visible: true`) — por ahora es solo vía acceso directo a la
+base. `Product`/`ProductVariant`/`Banner` tienen el campo `visible` en el schema; no se expone
+para editar desde ningún DTO.
+
+### Productos — `/admin/products`
+
+| Método | Ruta | Body / Query | Notas |
+|---|---|---|---|
+| GET | `/admin/products?page=&pageSize=&category=` | — | Igual forma que `GET /products` |
+| GET | `/admin/products/:id` | — | Igual forma que `GET /products/:id` |
+| POST | `/admin/products` | `{ categoryId, name, description, price, store, status?, variants: [{ color, sku, stock? }] }` | Crea el producto y sus variantes en una transacción. `404` si `categoryId` no existe o algún `color` no está en el catálogo de `Color`. `409` si el nombre ya existe en la categoría o algún `sku` está duplicado. |
+| PATCH | `/admin/products/:id` | Cualquier subconjunto de `categoryId/name/description/price/store/status` | `404` si el producto (o la nueva `categoryId`) no existe |
+| DELETE | `/admin/products/:id` | — | Borrado lógico (ver nota arriba) |
+| POST | `/admin/products/:id/variants` | `{ color, sku, stock? }` | `404` producto no existe o color inválido; `409` sku duplicado |
+| PATCH | `/admin/products/:id/variants/:variantId` | Subconjunto de `color/sku/stock` | `404`/`409` igual que arriba |
+| DELETE | `/admin/products/:id/variants/:variantId` | — | Borrado lógico (ver nota arriba) |
+
+### Banners — `/admin/banners`
+
+CRUD estándar: `GET` (paginado, todos los visibles — activos e inactivos), `GET /:id`, `POST`
+(`{ store, description, image, active?, sortOrder? }`), `PATCH /:id` (parcial), `DELETE /:id`
+(borrado lógico, ver nota arriba). `active` y `visible` son independientes: `active` lo controla
+el admin para pausar/reactivar sin perder el registro; `visible` es exclusivamente el borrado
+lógico y no se expone para editar.
+
+### Pedidos — `/admin/orders`
+
+| Método | Ruta | Notas |
+|---|---|---|
+| GET | `/admin/orders?page=&pageSize=&status=` | Pedidos de **todos** los usuarios (a diferencia de `GET /orders`), incluye `user` (sin `passwordHash`) |
+| GET | `/admin/orders/:id` | Igual forma que `GET /orders/:id` + `user`; `404` simple (sin el enmascarado ownership-vs-inexistencia de la versión no-admin) |
+| PATCH | `/admin/orders/:id/status` | Body: `{ status?, trackingNumber?, trackingCarrier? }` — `status` solo puede avanzar (`pending_payment → processing → shipped → delivered`), nunca retroceder (`400` si se intenta); tracking se puede setear independientemente del estado |
+
+### Usuarios — `/admin/users`
+
+| Método | Ruta | Notas |
+|---|---|---|
+| GET | `/admin/users?page=&pageSize=` | Nunca expone `passwordHash` |
+| GET | `/admin/users/:id` | — |
+| PATCH | `/admin/users/:id` | Body: subconjunto de `{ email, name, avatarUrl }` |
+| PATCH | `/admin/users/:id/role` | Body: `{ role: "user" \| "admin" }` — `400` si el admin autenticado intenta revocarse su propio rol |
+| PATCH | `/admin/users/:id/active` | Body: `{ active: boolean }` — `400` si el admin autenticado intenta desactivarse a sí mismo; un usuario con `active: false` no puede loguearse |
+
+---
+
 ## Resumen de rutas
 
 | Método | Ruta | Auth |
@@ -384,3 +471,25 @@ Marca `notified: true`. `200`: el `StockAlert` actualizado (sin `product` anidad
 | POST | `/orders` | Sí |
 | GET | `/notifications` | Sí |
 | PATCH | `/notifications/:id/read` | Sí |
+| GET | `/banners` | No |
+| GET | `/admin/products` | Admin |
+| GET | `/admin/products/:id` | Admin |
+| POST | `/admin/products` | Admin |
+| PATCH | `/admin/products/:id` | Admin |
+| DELETE | `/admin/products/:id` | Admin |
+| POST | `/admin/products/:id/variants` | Admin |
+| PATCH | `/admin/products/:id/variants/:variantId` | Admin |
+| DELETE | `/admin/products/:id/variants/:variantId` | Admin |
+| GET | `/admin/banners` | Admin |
+| GET | `/admin/banners/:id` | Admin |
+| POST | `/admin/banners` | Admin |
+| PATCH | `/admin/banners/:id` | Admin |
+| DELETE | `/admin/banners/:id` | Admin |
+| GET | `/admin/orders` | Admin |
+| GET | `/admin/orders/:id` | Admin |
+| PATCH | `/admin/orders/:id/status` | Admin |
+| GET | `/admin/users` | Admin |
+| GET | `/admin/users/:id` | Admin |
+| PATCH | `/admin/users/:id` | Admin |
+| PATCH | `/admin/users/:id/role` | Admin |
+| PATCH | `/admin/users/:id/active` | Admin |

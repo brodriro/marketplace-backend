@@ -16,6 +16,8 @@ import {
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateVariantDto } from './dto/update-variant.dto';
 
+const VISIBLE_VARIANTS = { where: { visible: true } };
+
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -24,12 +26,13 @@ export class ProductsService {
     const { page, pageSize } = query;
     const [items, total] = await this.prisma.$transaction([
       this.prisma.product.findMany({
+        where: { visible: true },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        include: { variants: true },
+        include: { variants: VISIBLE_VARIANTS },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.product.count(),
+      this.prisma.product.count({ where: { visible: true } }),
     ]);
     return { items, page, pageSize, total };
   }
@@ -37,9 +40,9 @@ export class ProductsService {
   async findOne(id: string) {
     const product = await this.prisma.product.findUnique({
       where: { id },
-      include: { variants: true },
+      include: { variants: VISIBLE_VARIANTS },
     });
-    if (!product) {
+    if (!product || !product.visible) {
       throw new NotFoundException('Producto no encontrado');
     }
 
@@ -61,12 +64,13 @@ export class ProductsService {
       query;
 
     const where: Prisma.ProductWhereInput = {
+      visible: true,
       ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
       ...(category ? { categoryId: category } : {}),
       ...(minPrice !== undefined || maxPrice !== undefined
         ? { price: { gte: minPrice, lte: maxPrice } }
         : {}),
-      ...(color ? { variants: { some: { color } } } : {}),
+      ...(color ? { variants: { some: { color, visible: true } } } : {}),
     };
 
     const orderBy: Prisma.ProductOrderByWithRelationInput =
@@ -81,7 +85,7 @@ export class ProductsService {
       orderBy,
       take: pageSize + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      include: { variants: true },
+      include: { variants: VISIBLE_VARIANTS },
     });
 
     const hasMore = items.length > pageSize;
@@ -150,7 +154,7 @@ export class ProductsService {
 
   async update(id: string, dto: UpdateProductDto) {
     const product = await this.prisma.product.findUnique({ where: { id } });
-    if (!product) {
+    if (!product || !product.visible) {
       throw new NotFoundException('Producto no encontrado');
     }
     if (dto.categoryId) {
@@ -164,33 +168,19 @@ export class ProductsService {
     return this.prisma.product.update({
       where: { id },
       data: dto,
-      include: { variants: true },
+      include: { variants: VISIBLE_VARIANTS },
     });
   }
 
+  /** Borrado lógico: nunca se hace DELETE físico, solo se apaga `visible` (así no se rompe el historial de pedidos). */
   async remove(id: string): Promise<void> {
-    const product = await this.prisma.product.findUnique({
-      where: { id },
-      include: { variants: { include: { _count: { select: { orderItems: true } } } } },
-    });
-    if (!product) {
+    const product = await this.prisma.product.findUnique({ where: { id } });
+    if (!product || !product.visible) {
       throw new NotFoundException('Producto no encontrado');
     }
-    const hasOrderedVariant = product.variants.some(
-      (v) => v._count.orderItems > 0,
-    );
-    if (hasOrderedVariant) {
-      throw new ConflictException(
-        'No se puede eliminar: el producto tiene variantes con pedidos asociados',
-      );
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.favorite.deleteMany({ where: { productId: id } });
-      await tx.stockAlert.deleteMany({ where: { productId: id } });
-      await tx.review.deleteMany({ where: { productId: id } });
-      await tx.productVariant.deleteMany({ where: { productId: id } });
-      await tx.product.delete({ where: { id } });
+    await this.prisma.product.update({
+      where: { id },
+      data: { visible: false },
     });
   }
 
@@ -198,7 +188,7 @@ export class ProductsService {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
     });
-    if (!product) {
+    if (!product || !product.visible) {
       throw new NotFoundException('Producto no encontrado');
     }
     await this.assertColorsExist([dto.color]);
@@ -217,7 +207,9 @@ export class ProductsService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        throw new ConflictException(`Ya existe una variante con SKU ${dto.sku}`);
+        throw new ConflictException(
+          `Ya existe una variante con SKU ${dto.sku}`,
+        );
       }
       throw error;
     }
@@ -227,7 +219,7 @@ export class ProductsService {
     const variant = await this.prisma.productVariant.findUnique({
       where: { id: variantId },
     });
-    if (!variant) {
+    if (!variant || !variant.visible) {
       throw new NotFoundException('Variante no encontrada');
     }
     if (dto.color) {
@@ -244,25 +236,25 @@ export class ProductsService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        throw new ConflictException(`Ya existe una variante con SKU ${dto.sku}`);
+        throw new ConflictException(
+          `Ya existe una variante con SKU ${dto.sku}`,
+        );
       }
       throw error;
     }
   }
 
+  /** Borrado lógico, igual que `remove()` — el stock/SKU quedan en la DB para no romper pedidos ya hechos. */
   async removeVariant(variantId: string): Promise<void> {
     const variant = await this.prisma.productVariant.findUnique({
       where: { id: variantId },
-      include: { _count: { select: { orderItems: true } } },
     });
-    if (!variant) {
+    if (!variant || !variant.visible) {
       throw new NotFoundException('Variante no encontrada');
     }
-    if (variant._count.orderItems > 0) {
-      throw new ConflictException(
-        'No se puede eliminar: la variante tiene pedidos asociados',
-      );
-    }
-    await this.prisma.productVariant.delete({ where: { id: variantId } });
+    await this.prisma.productVariant.update({
+      where: { id: variantId },
+      data: { visible: false },
+    });
   }
 }

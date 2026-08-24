@@ -40,7 +40,9 @@ describe('AuthController (e2e)', () => {
       .send({ email, password, name: 'E2E Tester' })
       .expect(201);
 
-    expect(response.body).toEqual({ accessToken: expect.any(String) as string });
+    expect(response.body).toEqual({
+      accessToken: expect.any(String) as string,
+    });
   });
 
   it('rejects a duplicate registration with 409', async () => {
@@ -56,7 +58,9 @@ describe('AuthController (e2e)', () => {
       .send({ email, password })
       .expect(200);
 
-    expect(response.body).toEqual({ accessToken: expect.any(String) as string });
+    expect(response.body).toEqual({
+      accessToken: expect.any(String) as string,
+    });
   });
 
   it('rejects invalid credentials with 401', async () => {

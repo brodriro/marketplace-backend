@@ -37,9 +37,12 @@ export class UsersService {
     return safeUser;
   }
 
-  async findAllAdmin(
-    query: PaginationQueryDto,
-  ): Promise<{ data: SafeUser[]; page: number; pageSize: number; total: number }> {
+  async findAllAdmin(query: PaginationQueryDto): Promise<{
+    data: SafeUser[];
+    page: number;
+    pageSize: number;
+    total: number;
+  }> {
     const { page, pageSize } = query;
     const [users, total] = await this.prisma.$transaction([
       this.prisma.user.findMany({
@@ -84,9 +87,7 @@ export class UsersService {
       throw new NotFoundException('Usuario no encontrado');
     }
     if (id === requesterId && role !== 'admin') {
-      throw new BadRequestException(
-        'No podés revocar tu propio rol de admin',
-      );
+      throw new BadRequestException('No podés revocar tu propio rol de admin');
     }
     const updated = await this.prisma.user.update({
       where: { id },
