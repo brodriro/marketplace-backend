@@ -33,7 +33,11 @@ export class OrdersService {
   findAllForUser(userId: string) {
     return this.prisma.order.findMany({
       where: { userId },
-      include: { items: true },
+      // `variant` acotado a `color`/`sku` — suficiente para pintar el line item en la lista
+      // de pedidos sin arrastrar el `product` completo (eso queda para `GET /orders/:id`).
+      include: {
+        items: { include: { variant: { select: { color: true, sku: true } } } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -101,7 +105,11 @@ export class OrdersService {
           etaDays: DEFAULT_ETA_DAYS,
           items: { create: itemsData },
         },
-        include: { items: true },
+        include: {
+          items: {
+            include: { variant: { select: { color: true, sku: true } } },
+          },
+        },
       });
     });
   }

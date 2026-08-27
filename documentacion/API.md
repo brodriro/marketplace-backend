@@ -284,7 +284,8 @@ no existe), `409` (el usuario ya dejó una reseña para este producto — 1 por 
 
 ### `GET /orders`
 
-`200`: array de `Order` con `items` (sin el detalle de `variant`/`product` anidado):
+`200`: array de `Order` con `items`. Cada line item trae `variant` acotado a `color` y `sku`
+(suficiente para pintar la fila); el `variant.product` completo solo se expande en `GET /orders/:id`.
 
 ```json
 {
@@ -299,7 +300,14 @@ no existe), `409` (el usuario ya dejó una reseña para este producto — 1 por 
   "createdAt": "ISO-8601",
   "updatedAt": "ISO-8601",
   "items": [
-    { "id": "uuid", "orderId": "uuid", "variantId": "uuid", "quantity": 1, "unitPrice": "349.00" }
+    {
+      "id": "uuid",
+      "orderId": "uuid",
+      "variantId": "uuid",
+      "quantity": 1,
+      "unitPrice": "349.00",
+      "variant": { "color": "string", "sku": "string" }
+    }
   ]
 }
 ```
@@ -350,9 +358,9 @@ Body:
 variante y calcula `total` a partir del `price` del producto en el momento de la compra — todo
 en una única transacción de Prisma: si algún ítem no tiene stock suficiente, no se persiste nada.
 
-`201`: el `Order` creado con `items` (forma de `GET /orders`, sin `variant` expandido). Errores:
-`400` (validación del body, o stock insuficiente — mensaje `Stock insuficiente para <sku>`),
-`404` (algún `variantId` no existe).
+`201`: el `Order` creado, misma forma que `GET /orders` (cada `item` con `variant: { color, sku }`,
+sin el `product` completo). Errores: `400` (validación del body, o stock insuficiente — mensaje
+`Stock insuficiente para <sku>`), `404` (algún `variantId` no existe).
 
 ---
 
