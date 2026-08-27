@@ -110,17 +110,25 @@ async function main(): Promise<void> {
 
       const variantIds: string[] = [];
       for (const colorName of product.colors) {
-        const sku = buildSkuBase(product.name, colorName);
-        const variant = await prisma.productVariant.upsert({
-          where: { sku },
-          create: {
-            productId: savedProduct.id,
-            color: colorName,
-            sku,
-            stock: Math.floor(random() * 30),
-          },
-          update: {},
+        // Se consume el PRNG siempre (haya o no que crear) para no correr la secuencia
+        // del stock sintético respecto de corridas anteriores.
+        const stock = Math.floor(random() * 30);
+        // Match por (producto, color), NO por SKU: si el nombre del producto cambió
+        // (p. ej. traducción EN→ES) el SKU derivado cambiaría y un match por SKU crearía
+        // variantes duplicadas. El SKU solo se usa al crear una variante nueva.
+        const existing = await prisma.productVariant.findFirst({
+          where: { productId: savedProduct.id, color: colorName },
         });
+        const variant =
+          existing ??
+          (await prisma.productVariant.create({
+            data: {
+              productId: savedProduct.id,
+              color: colorName,
+              sku: buildSkuBase(product.name, colorName),
+              stock,
+            },
+          }));
         variantIds.push(variant.id);
       }
       variantIdsByProduct.set(savedProduct.id, variantIds);
