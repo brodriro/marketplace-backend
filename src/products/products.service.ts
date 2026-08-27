@@ -125,6 +125,7 @@ export class ProductsService {
             categoryId: dto.categoryId,
             name: dto.name,
             description: dto.description,
+            image: dto.image,
             price: dto.price,
             store: dto.store,
             status: dto.status,

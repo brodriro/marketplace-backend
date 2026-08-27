@@ -32,6 +32,7 @@ const random = mulberry32(20260822);
 interface FeedProduct {
   name: string;
   description: string;
+  image: string;
   price: number;
   store: string;
   status: 'Hot' | 'New' | 'Normal' | 'Popular';
@@ -104,12 +105,14 @@ async function main(): Promise<void> {
           categoryId: savedCategory.id,
           name: product.name,
           description: product.description,
+          image: product.image,
           price: product.price,
           store: product.store,
           status: product.status,
         },
         update: {
           description: product.description,
+          image: product.image,
           price: product.price,
           store: product.store,
           status: product.status,

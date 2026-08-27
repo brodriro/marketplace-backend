@@ -69,6 +69,22 @@ export const api = {
 
   categories: {
     list: () => request<Category[]>("/categories"),
+    get: (id: string) => request<Category>(`/admin/categories/${id}`),
+    create: (data: { name: string; subtitle?: string; image?: string }) =>
+      request<Category>("/admin/categories", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (
+      id: string,
+      data: Partial<{ name: string; subtitle: string; image: string }>,
+    ) =>
+      request<Category>(`/admin/categories/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    remove: (id: string) =>
+      request<void>(`/admin/categories/${id}`, { method: "DELETE" }),
   },
 
   products: {
@@ -81,6 +97,7 @@ export const api = {
       categoryId: string;
       name: string;
       description: string;
+      image?: string;
       price: number;
       store: string;
       status?: string;
@@ -94,6 +111,7 @@ export const api = {
       categoryId: string;
       name: string;
       description: string;
+      image: string | null;
       price: number;
       store: string;
       status: string;

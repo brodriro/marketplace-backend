@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUrl,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -21,6 +22,10 @@ export class CreateProductDto {
 
   @IsString()
   description: string;
+
+  @IsOptional()
+  @IsUrl()
+  image?: string;
 
   @IsNumber()
   @Min(0)

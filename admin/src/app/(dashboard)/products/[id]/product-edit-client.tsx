@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ImageUrlField } from "@/components/image-url-field";
 import { ApiError, api } from "@/lib/api-client";
 import { KNOWN_COLORS } from "@/lib/types";
 import type { Category, Product, ProductStatus } from "@/lib/types";
@@ -37,6 +38,7 @@ export function ProductEditClient({ id }: { id: string }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [image, setImage] = useState("");
   const [price, setPrice] = useState("");
   const [store, setStore] = useState("");
   const [status, setStatus] = useState<ProductStatus>("Normal");
@@ -53,6 +55,7 @@ export function ProductEditClient({ id }: { id: string }) {
       setProduct(p);
       setName(p.name);
       setDescription(p.description);
+      setImage(p.image ?? "");
       setPrice(p.price);
       setStore(p.store);
       setStatus(p.status);
@@ -76,6 +79,7 @@ export function ProductEditClient({ id }: { id: string }) {
         categoryId,
         name,
         description,
+        image: image.trim() === "" ? null : image.trim(),
         price: Number(price),
         store,
         status,
@@ -177,6 +181,12 @@ export function ProductEditClient({ id }: { id: string }) {
               onChange={(e) => setDescription(e.target.value)}
             />
           </div>
+          <ImageUrlField
+            id="image"
+            label="Imagen (URL)"
+            value={image}
+            onChange={setImage}
+          />
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="price">Precio</Label>

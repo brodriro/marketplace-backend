@@ -13,19 +13,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ProductStatusBadge } from "@/components/status-badge";
 import { ApiError, api } from "@/lib/api-client";
-import type { Product } from "@/lib/types";
+import type { Category } from "@/lib/types";
 
-export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[] | null>(null);
+export default function CategoriesPage() {
+  const [categories, setCategories] = useState<Category[] | null>(null);
 
   async function load() {
     try {
-      const res = await api.products.list(1, 100);
-      setProducts(res.items);
+      const res = await api.categories.list();
+      setCategories(res);
     } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "Error cargando productos");
+      toast.error(
+        error instanceof ApiError ? error.message : "Error cargando categorías",
+      );
     }
   }
 
@@ -37,9 +38,9 @@ export default function ProductsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Productos</h1>
+        <h1 className="text-2xl font-semibold">Categorías</h1>
         <Button asChild>
-          <Link href="/products/new">Nuevo producto</Link>
+          <Link href="/categories/new">Nueva categoría</Link>
         </Button>
       </div>
 
@@ -49,22 +50,19 @@ export default function ProductsPage() {
             <TableRow>
               <TableHead className="w-20">Imagen</TableHead>
               <TableHead>Nombre</TableHead>
-              <TableHead>Tienda</TableHead>
-              <TableHead>Precio</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Variantes</TableHead>
+              <TableHead>Subtítulo</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {products?.map((product) => (
-              <TableRow key={product.id}>
+            {categories?.map((category) => (
+              <TableRow key={category.id}>
                 <TableCell>
-                  {product.image ? (
+                  {category.image ? (
                     // eslint-disable-next-line @next/next/no-img-element -- imagen externa arbitraria
                     <img
-                      src={product.image}
-                      alt={product.name}
+                      src={category.image}
+                      alt={category.name}
                       width={64}
                       height={40}
                       className="h-10 w-16 rounded object-cover"
@@ -75,24 +73,21 @@ export default function ProductsPage() {
                     </div>
                   )}
                 </TableCell>
-                <TableCell className="font-medium">{product.name}</TableCell>
-                <TableCell>{product.store}</TableCell>
-                <TableCell>${product.price}</TableCell>
-                <TableCell>
-                  <ProductStatusBadge status={product.status} />
+                <TableCell className="font-medium">{category.name}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {category.subtitle ?? "—"}
                 </TableCell>
-                <TableCell>{product.variants.length}</TableCell>
                 <TableCell className="text-right">
                   <Button asChild variant="outline" size="sm">
-                    <Link href={`/products/${product.id}`}>Editar</Link>
+                    <Link href={`/categories/${category.id}`}>Editar</Link>
                   </Button>
                 </TableCell>
               </TableRow>
             ))}
-            {products?.length === 0 && (
+            {categories?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
-                  No hay productos.
+                <TableCell colSpan={4} className="text-center text-muted-foreground">
+                  No hay categorías.
                 </TableCell>
               </TableRow>
             )}

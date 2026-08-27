@@ -81,6 +81,7 @@ model Product {
   categoryId  String
   name        String
   description String
+  image       String?
   price       Decimal       @db.Decimal(10, 2)
   store       String
   status      ProductStatus @default(Normal)

@@ -8,6 +8,7 @@ import {
   Package,
   Image as ImageIcon,
   ShoppingCart,
+  Tags,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ import { cn } from "@/lib/utils";
 const NAV_ITEMS = [
   { href: "/", label: "Resumen", icon: LayoutDashboard },
   { href: "/products", label: "Productos", icon: Package },
+  { href: "/categories", label: "Categorías", icon: Tags },
   { href: "/banners", label: "Banners", icon: ImageIcon },
   { href: "/orders", label: "Pedidos", icon: ShoppingCart },
   { href: "/users", label: "Usuarios", icon: Users },

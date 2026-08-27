@@ -126,6 +126,8 @@ Errores: `400` (validación), `401` (credenciales inválidas).
 { "id": "uuid", "name": "string", "subtitle": "string | null", "image": "string | null" }
 ```
 
+Edición del catálogo de categorías: ver **Admin → Categorías** (`/admin/categories`).
+
 ---
 
 ## Products
@@ -153,6 +155,7 @@ Forma de cada `Product` en `items`:
   "categoryId": "uuid",
   "name": "string",
   "description": "string",
+  "image": "string | null",
   "price": "199.99",
   "store": "string",
   "status": "Hot | New | Normal | Popular",
@@ -400,13 +403,14 @@ Todos los endpoints de esta sección requieren JWT válido **y** `role: admin` (
 `401` sin token, `403` con token válido pero rol `user`. Pensados para el dashboard de
 administración (`admin/`), no para el cliente Android.
 
-**Borrado lógico**: todo `DELETE` de esta sección (productos, variantes, banners) nunca hace un
-`DELETE` físico en la base — internamente es un `UPDATE` que apaga `visible` (`true → false`).
+**Borrado lógico**: el `DELETE` de productos, variantes y banners nunca hace un `DELETE`
+físico en la base — internamente es un `UPDATE` que apaga `visible` (`true → false`).
 El registro deja de aparecer en cualquier listado (público y admin) pero sigue existiendo en la
 DB, así que pedidos ya creados que referencian ese producto/variante no se ven afectados. No hay
 endpoint para revertirlo (restaurar `visible: true`) — por ahora es solo vía acceso directo a la
 base. `Product`/`ProductVariant`/`Banner` tienen el campo `visible` en el schema; no se expone
-para editar desde ningún DTO.
+para editar desde ningún DTO. **Excepción**: `DELETE /admin/categories/:id` sí es un borrado
+físico (`Category` no tiene `visible`) y solo se permite sobre categorías sin productos.
 
 ### Productos — `/admin/products`
 
@@ -414,12 +418,22 @@ para editar desde ningún DTO.
 |---|---|---|---|
 | GET | `/admin/products?page=&pageSize=&category=` | — | Igual forma que `GET /products` |
 | GET | `/admin/products/:id` | — | Igual forma que `GET /products/:id` |
-| POST | `/admin/products` | `{ categoryId, name, description, price, store, status?, variants: [{ color, sku, stock? }] }` | Crea el producto y sus variantes en una transacción. `404` si `categoryId` no existe o algún `color` no está en el catálogo de `Color`. `409` si el nombre ya existe en la categoría o algún `sku` está duplicado. |
-| PATCH | `/admin/products/:id` | Cualquier subconjunto de `categoryId/name/description/price/store/status` | `404` si el producto (o la nueva `categoryId`) no existe |
+| POST | `/admin/products` | `{ categoryId, name, description, image?, price, store, status?, variants: [{ color, sku, stock? }] }` | Crea el producto y sus variantes en una transacción. `image` (si viene) debe ser una URL válida. `404` si `categoryId` no existe o algún `color` no está en el catálogo de `Color`. `409` si el nombre ya existe en la categoría o algún `sku` está duplicado. |
+| PATCH | `/admin/products/:id` | Cualquier subconjunto de `categoryId/name/description/image/price/store/status` | `image` acepta una URL válida o `null` (para quitar la imagen). `404` si el producto (o la nueva `categoryId`) no existe |
 | DELETE | `/admin/products/:id` | — | Borrado lógico (ver nota arriba) |
 | POST | `/admin/products/:id/variants` | `{ color, sku, stock? }` | `404` producto no existe o color inválido; `409` sku duplicado |
 | PATCH | `/admin/products/:id/variants/:variantId` | Subconjunto de `color/sku/stock` | `404`/`409` igual que arriba |
 | DELETE | `/admin/products/:id/variants/:variantId` | — | Borrado lógico (ver nota arriba) |
+
+### Categorías — `/admin/categories`
+
+| Método | Ruta | Body | Notas |
+|---|---|---|---|
+| GET | `/admin/categories` | — | Array completo (misma forma que `GET /categories`, sin paginar) |
+| GET | `/admin/categories/:id` | — | Una categoría; `404` si no existe |
+| POST | `/admin/categories` | `{ name, subtitle?, image? }` | `image` (si viene) debe ser URL válida. `409` si el `name` ya existe |
+| PATCH | `/admin/categories/:id` | Subconjunto de `{ name, subtitle, image }` | `404` si no existe; `409` si el nuevo `name` choca con otra categoría |
+| DELETE | `/admin/categories/:id` | — | **Borrado físico** (no hay `visible` en `Category`). `409` si la categoría tiene productos asociados — hay que reasignarlos o eliminarlos primero |
 
 ### Banners — `/admin/banners`
 
@@ -480,6 +494,11 @@ lógico y no se expone para editar.
 | POST | `/admin/products/:id/variants` | Admin |
 | PATCH | `/admin/products/:id/variants/:variantId` | Admin |
 | DELETE | `/admin/products/:id/variants/:variantId` | Admin |
+| GET | `/admin/categories` | Admin |
+| GET | `/admin/categories/:id` | Admin |
+| POST | `/admin/categories` | Admin |
+| PATCH | `/admin/categories/:id` | Admin |
+| DELETE | `/admin/categories/:id` | Admin |
 | GET | `/admin/banners` | Admin |
 | GET | `/admin/banners/:id` | Admin |
 | POST | `/admin/banners` | Admin |

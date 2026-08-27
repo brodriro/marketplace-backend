@@ -47,6 +47,7 @@ export interface Product {
   categoryId: string;
   name: string;
   description: string;
+  image: string | null;
   price: string;
   store: string;
   status: ProductStatus;

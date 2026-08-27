@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ImageUrlField } from "@/components/image-url-field";
 import { ApiError, api } from "@/lib/api-client";
 import { KNOWN_COLORS } from "@/lib/types";
 import type { Category, ProductStatus } from "@/lib/types";
@@ -31,6 +32,7 @@ export default function NewProductPage() {
   const [categoryId, setCategoryId] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [image, setImage] = useState("");
   const [price, setPrice] = useState("");
   const [store, setStore] = useState("");
   const [status, setStatus] = useState<ProductStatus>("Normal");
@@ -67,6 +69,7 @@ export default function NewProductPage() {
         categoryId,
         name,
         description,
+        ...(image ? { image } : {}),
         price: Number(price),
         store,
         status,
@@ -119,6 +122,8 @@ export default function NewProductPage() {
             onChange={(e) => setDescription(e.target.value)}
           />
         </div>
+
+        <ImageUrlField id="image" label="Imagen (URL)" value={image} onChange={setImage} />
 
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-2">
