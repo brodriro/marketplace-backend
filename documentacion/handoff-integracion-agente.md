@@ -158,6 +158,34 @@ en español.
 Impacto en clientes: `mobile` (Android) muestra `name` en vivo desde el API, sin caché persistente
 → transparente. Nombres editables desde el panel admin si alguna traducción no encaja.
 
+## Prueba conjunta 2026-08-27 — 4/4 verde
+
+Las tres sesiones (`backend`, `mobile`/Android, `mobile-agente`) corrieron un test end-to-end.
+
+**Entorno del test:** app Android (release) y agente (`:2500`) → `http://192.168.31.63:3000/`
+(server local corriendo la rama `feat/catalog-promo-sku-es-names`, `node dist/main.js` como
+proceso detached del sistema) → **mismo RDS** de `api.brodriro.dev` (ya migrado). `api.brodriro.dev`
+deployado NO se tocó (sigue con código previo, sin endpoint promo).
+
+**Resultado:** los 4 puntos pasan.
+1. Nombres ES en vivo en grilla/detalle/carrito/chat/favoritos.
+2. Registro + login real (`POST /auth/*`).
+3. Flujo completo Home→detalle→favorito→carrito→`POST /orders` (con `variantId`)→"Payment
+   successful". Order creada, visible en My Orders, favorito persiste.
+4. Chat A2UI: `ProductItem` + `VariantSelector` con las variantes reales.
+
+**Hallazgo corregido en el acto:** `GET /orders` devolvía line items sin datos de variante
+→ Android mostraba "Color: -". Ahora `GET /orders` y la respuesta de `POST /orders` incluyen
+`items[].variant: { color, sku }` (commit `554cc70`). `GET /orders/:id` sin cambios.
+
+**Pendientes post-prueba (sin apuro, sin dueño de fecha):**
+- Backend: `400` de stock insuficiente debería devolver el/los SKU en un campo estructurado
+  (`insufficientStockSkus`) en vez de solo en el texto — el agente hoy parsea el string best-effort.
+- Backend: mergear `feat/catalog-promo-sku-es-names` a master y redeployar `api.brodriro.dev`
+  (para que el endpoint promo y el SKU opcional del panel estén en prod, no solo en el `:3000` local).
+- Backend: job de limpieza de usuarios throwaway de la opción B (`agent+<contextId>@...`).
+- Cliente (`mobile`): fallback de `GET /me` (§16) no se recupera solo tras un fallo transitorio.
+
 ## Lo que NO se hizo (a propósito)
 
 - `/cart` server-side y modelos `Cart`/`CartItem` — descartado.
