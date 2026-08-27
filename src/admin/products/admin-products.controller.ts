@@ -68,4 +68,10 @@ export class AdminProductsController {
   removeVariant(@Param('variantId') variantId: string) {
     return this.productsService.removeVariant(variantId);
   }
+
+  /** Regenera el SKU de la variante con el esquema canónico `<slug(producto)>-<slug(color)>`. */
+  @Post(':id/variants/:variantId/regenerate-sku')
+  regenerateVariantSku(@Param('variantId') variantId: string) {
+    return this.productsService.regenerateVariantSku(variantId);
+  }
 }

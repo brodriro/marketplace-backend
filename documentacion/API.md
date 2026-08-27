@@ -167,6 +167,15 @@ Forma de cada `Product` en `items`:
 }
 ```
 
+**`sku` de variante** — identificador estable de la variante (no el `id` uuid). Esquema canónico:
+`<slug(nombre del producto)>-<slug(color)>` en minúsculas y solo `[a-z0-9-]`
+(p. ej. `wireless-mouse-blue`, `portable-ssd-1tb-lightblue`); si dos variantes colisionarían,
+la segunda lleva sufijo `-2`, `-3`, … Es único (`@unique` en la DB) y es el `value` que los
+clientes A2UI (`VariantSelector`) y el agente conversacional usan para referirse a una variante
+en carrito/stock. El backend lo autogenera con este esquema si no se envía uno explícito al crear
+la variante (ver **Admin → Productos**); una vez creado no cambia solo (renombrar el producto no
+reescribe SKUs existentes) salvo que se lo regenere o edite a mano desde el panel admin.
+
 ### `GET /products/:id`
 
 `200`: el `Product` de arriba (con `variants`) + dos campos agregados:
@@ -397,6 +406,45 @@ array de:
 
 ---
 
+## Promo codes
+
+### `GET /promo-codes/:code`
+
+Público, sin auth. Valida un código de descuento para la tool `apply_discount_code` del agente
+conversacional. `:code` se normaliza a mayúsculas en el lookup (`welcome10` == `WELCOME10`).
+
+`200`:
+
+```json
+{
+  "code": "WELCOME10",
+  "type": "percentage | fixed_amount",
+  "value": "10.00",
+  "appliesToCategory": "uuid | null",
+  "minPurchase": "0.00",
+  "validFrom": "ISO-8601",
+  "validUntil": "ISO-8601"
+}
+```
+
+- `value` y `minPurchase` son `Decimal` → viajan como **string** (`"10.00"`), igual que
+  `price`/`total`.
+- `type: "percentage"` → `value` es el porcentaje de descuento (`"10.00"` = 10 %).
+  `type: "fixed_amount"` → `value` es el monto a descontar, en la misma moneda que `price`.
+- `appliesToCategory` (si no es `null`) es un `Category.id` — el descuento aplica solo a ítems de
+  esa categoría. `minPurchase` es el subtotal mínimo para que el código sea válido.
+- El backend **no** aplica el descuento en `POST /orders` (que no acepta `discountCode`) — este
+  endpoint es solo validación; el total con descuento lo calcula el cliente.
+
+Errores: `404` si el código no existe **o** si `now` está fuera de `[validFrom, validUntil]`
+(expirado o todavía no vigente) — ambos casos devuelven el mismo `404`.
+
+Códigos sembrados por `prisma/seed.ts`: `WELCOME10` (10 % global), `ENVIOGRATIS`
+(`fixed_amount` 15, `minPurchase` 100), `CATEGORIA20` (20 % acotado a una categoría,
+`minPurchase` 50) y `EXPIRADO5` (vencido a propósito, siempre `404`).
+
+---
+
 ## Admin 🔒🛡️
 
 Todos los endpoints de esta sección requieren JWT válido **y** `role: admin` (`RolesGuard`) —
@@ -418,11 +466,12 @@ físico (`Category` no tiene `visible`) y solo se permite sobre categorías sin 
 |---|---|---|---|
 | GET | `/admin/products?page=&pageSize=&category=` | — | Igual forma que `GET /products` |
 | GET | `/admin/products/:id` | — | Igual forma que `GET /products/:id` |
-| POST | `/admin/products` | `{ categoryId, name, description, image?, price, store, status?, variants: [{ color, sku, stock? }] }` | Crea el producto y sus variantes en una transacción. `image` (si viene) debe ser una URL válida. `404` si `categoryId` no existe o algún `color` no está en el catálogo de `Color`. `409` si el nombre ya existe en la categoría o algún `sku` está duplicado. |
-| PATCH | `/admin/products/:id` | Cualquier subconjunto de `categoryId/name/description/image/price/store/status` | `image` acepta una URL válida o `null` (para quitar la imagen). `404` si el producto (o la nueva `categoryId`) no existe |
+| POST | `/admin/products` | `{ categoryId, name, description, image?, price, store, status?, variants: [{ color, sku?, stock? }] }` | Crea el producto y sus variantes en una transacción. `sku` es **opcional**: si se omite, el backend lo autogenera con el esquema canónico `<slug(nombre)>-<slug(color)>` (+ sufijo `-N` si choca); si se envía, debe ser `[a-z0-9-]` (segmentos separados por un guión). `image` (si viene) debe ser una URL válida. `404` si `categoryId` no existe o algún `color` no está en el catálogo de `Color`. `409` si el nombre ya existe en la categoría o un `sku` explícito está duplicado. |
+| PATCH | `/admin/products/:id` | Cualquier subconjunto de `categoryId/name/description/image/price/store/status` | `image` acepta una URL válida o `null` (para quitar la imagen). `404` si el producto (o la nueva `categoryId`) no existe. Renombrar el producto **no** reescribe los `sku` de sus variantes. |
 | DELETE | `/admin/products/:id` | — | Borrado lógico (ver nota arriba) |
-| POST | `/admin/products/:id/variants` | `{ color, sku, stock? }` | `404` producto no existe o color inválido; `409` sku duplicado |
-| PATCH | `/admin/products/:id/variants/:variantId` | Subconjunto de `color/sku/stock` | `404`/`409` igual que arriba |
+| POST | `/admin/products/:id/variants` | `{ color, sku?, stock? }` | `sku` opcional — mismo autogenerado/validación que en `POST /admin/products`. `404` producto no existe o color inválido; `409` si un `sku` explícito choca con otro. |
+| PATCH | `/admin/products/:id/variants/:variantId` | Subconjunto de `color/sku/stock` | `sku` debe ser `[a-z0-9-]`. `404`/`409` igual que arriba |
+| POST | `/admin/products/:id/variants/:variantId/regenerate-sku` | — | Regenera el `sku` de la variante con el esquema canónico a partir del nombre actual del producto + el color de la variante (+ sufijo `-N` si choca con otra). Devuelve la variante actualizada. `404` si la variante no existe. Pensado para el botón "regenerar SKU" del panel. |
 | DELETE | `/admin/products/:id/variants/:variantId` | — | Borrado lógico (ver nota arriba) |
 
 ### Categorías — `/admin/categories`
@@ -486,6 +535,7 @@ lógico y no se expone para editar.
 | GET | `/notifications` | Sí |
 | PATCH | `/notifications/:id/read` | Sí |
 | GET | `/banners` | No |
+| GET | `/promo-codes/:code` | No |
 | GET | `/admin/products` | Admin |
 | GET | `/admin/products/:id` | Admin |
 | POST | `/admin/products` | Admin |
@@ -493,6 +543,7 @@ lógico y no se expone para editar.
 | DELETE | `/admin/products/:id` | Admin |
 | POST | `/admin/products/:id/variants` | Admin |
 | PATCH | `/admin/products/:id/variants/:variantId` | Admin |
+| POST | `/admin/products/:id/variants/:variantId/regenerate-sku` | Admin |
 | DELETE | `/admin/products/:id/variants/:variantId` | Admin |
 | GET | `/admin/categories` | Admin |
 | GET | `/admin/categories/:id` | Admin |

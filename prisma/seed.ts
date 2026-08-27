@@ -9,6 +9,7 @@ import {
   Role,
   type User,
 } from '../src/generated/prisma/client';
+import { buildSkuBase } from '../src/products/sku.util';
 
 const SALT_ROUNDS = 10;
 const FIXED_ORDER_ID = '00000000-0000-0000-0000-000000000001';
@@ -56,19 +57,6 @@ interface FeedData {
   colors: { name: string; value: string }[];
   feed: FeedBanner[];
   categories: FeedCategory[];
-}
-
-function slugify(value: string): string {
-  const withoutDiacritics = value
-    .toLowerCase()
-    .normalize('NFD')
-    .split('')
-    .filter((char) => {
-      const code = char.codePointAt(0) ?? 0;
-      return code < 0x0300 || code > 0x036f; // descarta marcas diacríticas combinadas
-    })
-    .join('');
-  return withoutDiacritics.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
 async function main(): Promise<void> {
@@ -120,10 +108,9 @@ async function main(): Promise<void> {
       });
       productIds.push(savedProduct.id);
 
-      const slug = slugify(product.name);
       const variantIds: string[] = [];
       for (const colorName of product.colors) {
-        const sku = `${slug}-${slugify(colorName)}`;
+        const sku = buildSkuBase(product.name, colorName);
         const variant = await prisma.productVariant.upsert({
           where: { sku },
           create: {
@@ -256,6 +243,68 @@ async function main(): Promise<void> {
         shippingCity: 'Lima',
         etaDays: 3,
         items: { create: orderItemsData },
+      },
+    });
+  }
+
+  console.log('Seeding promo codes...');
+  const firstCategory = await prisma.category.findFirst({
+    orderBy: { name: 'asc' },
+  });
+  const farFuture = new Date('2030-12-31T23:59:59Z');
+  const promoCodes = [
+    // Porcentaje global, sin mínimo de compra.
+    {
+      code: 'WELCOME10',
+      type: 'percentage' as const,
+      value: 10,
+      appliesToCategory: null,
+      minPurchase: 0,
+      validFrom: new Date('2025-01-01T00:00:00Z'),
+      validUntil: farFuture,
+    },
+    // Monto fijo, requiere compra mínima.
+    {
+      code: 'ENVIOGRATIS',
+      type: 'fixed_amount' as const,
+      value: 15,
+      appliesToCategory: null,
+      minPurchase: 100,
+      validFrom: new Date('2025-01-01T00:00:00Z'),
+      validUntil: farFuture,
+    },
+    // Acotado a una categoría (la primera por orden alfabético).
+    {
+      code: 'CATEGORIA20',
+      type: 'percentage' as const,
+      value: 20,
+      appliesToCategory: firstCategory?.id ?? null,
+      minPurchase: 50,
+      validFrom: new Date('2025-01-01T00:00:00Z'),
+      validUntil: farFuture,
+    },
+    // Vencido a propósito — para probar el 404 por fuera de vigencia.
+    {
+      code: 'EXPIRADO5',
+      type: 'percentage' as const,
+      value: 5,
+      appliesToCategory: null,
+      minPurchase: 0,
+      validFrom: new Date('2024-01-01T00:00:00Z'),
+      validUntil: new Date('2024-12-31T23:59:59Z'),
+    },
+  ];
+  for (const promo of promoCodes) {
+    await prisma.promoCode.upsert({
+      where: { code: promo.code },
+      create: promo,
+      update: {
+        type: promo.type,
+        value: promo.value,
+        appliesToCategory: promo.appliesToCategory,
+        minPurchase: promo.minPurchase,
+        validFrom: promo.validFrom,
+        validUntil: promo.validUntil,
       },
     });
   }

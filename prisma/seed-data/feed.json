@@ -64,7 +64,7 @@
           ]
         },
         {
-          "name": "Headphones Pro",
+          "name": "Auriculares Pro",
           "description": "Auriculares con cancelación de ruido activa y sonido Hi-Fi.",
           "price": 149.50,
           "image": "https://http2.mlstatic.com/D_NQ_NP_819285-MPE72549492487_102023-O.webp",
@@ -86,7 +86,7 @@
           ]
         },
         {
-          "name": "4K Drone",
+          "name": "Dron 4K",
           "description": "Dron compacto con cámara 4K y estabilización gimbal.",
           "price": 349.00,
           "image": "https://5.imimg.com/data5/SELLER/Default/2024/10/461345605/ZE/QF/NM/84394228/izi-spectra-combo-drone-with-camera-4k-hdr-cinematic-1-cmos-sensor-500x500.png",
@@ -104,7 +104,7 @@
           ]
         },
         {
-          "name": "Wireless Charger",
+          "name": "Cargador Inalámbrico",
           "description": "Base de carga inalámbrica rápida compatible con Qi.",
           "price": 29.99,
           "image": "https://m.media-amazon.com/images/I/51pbKzrAd9L.jpg",
@@ -132,7 +132,7 @@
       "position": "right",
       "products": [
         {
-          "name": "Denim Jacket",
+          "name": "Chaqueta de Jean",
           "description": "Chaqueta vaquera clásica con corte ajustado.",
           "price": 89.90,
           "image": "https://lsco.scene7.com/is/image/lsco/A06320000-front-pdp?fmt=jpeg&qlt=70&resMode=sharp2&fit=crop,1&op_usm=0.6,0.6,8&wid=880&hei=880",
@@ -152,7 +152,7 @@
           ]
         },
         {
-          "name": "Graphic T-Shirt",
+          "name": "Remera Estampada",
           "description": "Camiseta de algodón con estampado único.",
           "price": 24.99,
           "image": "https://m.media-amazon.com/images/I/61ETIupdWLL._AC_UY1000_.jpg",
@@ -172,7 +172,7 @@
           ]
         },
         {
-          "name": "Leather Belt",
+          "name": "Cinturón de Cuero",
           "description": "Cinturón de piel genuina con hebilla metálica.",
           "price": 45.00,
           "image": "https://redhorns.in/cdn/shop/products/GB10AntBrown-1.jpg?v=1669027446",
@@ -190,7 +190,7 @@
           ]
         },
         {
-          "name": "Chino Pants",
+          "name": "Pantalón Chino",
           "description": "Pantalones chinos slim fit, muy cómodos.",
           "price": 59.99,
           "image": "https://media.centrepointstores.com/i/centrepoint/5015316-HQ150618-SPWIN24270224_01-2100.jpg?fmt=auto&",
@@ -218,7 +218,7 @@
       "position": "left",
       "products": [
         {
-          "name": "Backpack Traveler",
+          "name": "Mochila Viajera",
           "description": "Mochila resistente al agua con múltiples compartimentos.",
           "price": 79.95,
           "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS5vKiItM4pWBpau6a6xyI4y0iJ2xWfDQ8glDiWPDO8FUCxrBicp8GxGVjjThw01yzF3_4&usqp=CAU",
@@ -238,7 +238,7 @@
           ]
         },
         {
-          "name": "Leather Tote",
+          "name": "Bolso Tote de Cuero",
           "description": "Bolso tote de piel suave, ideal para diario.",
           "price": 120.00,
           "image": "https://i.pinimg.com/474x/4e/25/6b/4e256b6e2b3c7a381c5c6526b319bf9f.jpg",
@@ -258,7 +258,7 @@
           ]
         },
         {
-          "name": "Crossbody Bag",
+          "name": "Bolso Bandolera",
           "description": "Bolso bandolera compacto con correa ajustable.",
           "price": 49.99,
           "image": "https://m-commerce.countryroad.com/productimages_display/TRMEDIUM/1/121637_568518_378212.jpg",
@@ -278,7 +278,7 @@
           ]
         },
         {
-          "name": "Duffel Bag",
+          "name": "Bolso de Viaje",
           "description": "Bolsa de viaje tipo duffel, espaciosa y duradera.",
           "price": 99.99,
           "image": "https://m-commerce.mimco-accessories.com/productimages_display/zoom/2/24125_39994_88982.jpg",
@@ -304,7 +304,7 @@
       "position": "right",
       "products": [
         {
-          "name": "Running Sneakers",
+          "name": "Zapatillas para Correr",
           "description": "Zapatillas ligeras con amortiguación Gel.",
           "price": 110.00,
           "image": "https://www.nike.sa/dw/image/v2/BDVB_PRD/on/demandware.static/-/Sites-akeneo-master-catalog/default/dw9d092259/nk/556/8/5/c/4/a/55685c4a_d8d3_4140_a0ca_27df2220a9e3.jpg?sw=700&sh=700&sm=fit&q=100&strip=false",
@@ -322,7 +322,7 @@
           ]
         },
         {
-          "name": "Leather Boots",
+          "name": "Botas de Cuero",
           "description": "Botas de cuero con suela antideslizante.",
           "price": 139.99,
           "image": "https://assets.ajio.com/medias/sys_master/root/20230421/Gzob/64428607711cf97ba73d2bb0/-473Wx593H-466083260-tan-MODEL8.jpg",
@@ -343,7 +343,7 @@
           ]
         },
         {
-          "name": "Slip-On Loafers",
+          "name": "Mocasines sin Cordones",
           "description": "Mocasines cómodos para uso casual.",
           "price": 69.50,
           "image": "https://i.ebayimg.com/images/g/2a4AAOSwGYZmciIn/s-l1200.jpg",
@@ -363,7 +363,7 @@
           ]
         },
         {
-          "name": "Canvas Sneakers",
+          "name": "Zapatillas de Lona",
           "description": "Zapatillas de lona clásicas y versátiles.",
           "price": 49.99,
           "image": "https://images-cdn.ubuy.co.in/633af87aeba0d54e2d4d4787-women-shoes-sneakers-girls-canvas-shoes.jpg",
@@ -389,7 +389,7 @@
       "position": "left",
       "products": [
         {
-          "name": "Bluetooth Speaker",
+          "name": "Parlante Bluetooth",
           "description": "Altavoz portátil con sonido estéreo 360°.",
           "price": 59.99,
           "image": "https://www.dimprice.co.uk/image/cache/catalog/products_2022/1-1-800x800.jpg",
@@ -407,7 +407,7 @@
           ]
         },
         {
-          "name": "Portable SSD 1TB",
+          "name": "SSD Portátil 1TB",
           "description": "Disco duro sólido USB-C de alta velocidad.",
           "price": 129.99,
           "image": "https://cdn.panacompu.com/cdn-img/pv/sd-1.jpg",
@@ -429,7 +429,7 @@
           ]
         },
         {
-          "name": "Wireless Mouse",
+          "name": "Mouse Inalámbrico",
           "description": "Ratón ergonómico con sensor óptico 16000 DPI.",
           "price": 39.99,
           "image": "https://thotcomputacion.com.uy/wp-content/uploads/2023/05/Logitech2520PRO2520Gaming_175332_146b72173b84431fa325b0734554df7b.webp",
@@ -447,7 +447,7 @@
           ]
         },
         {
-          "name": "Gaming Keyboard",
+          "name": "Teclado Gamer",
           "description": "Teclado mecánico RGB con switches táctiles.",
           "price": 89.99,
           "image": "https://techspertz.co.za/wp-content/uploads/2021/12/T-TGK306_wr_06.jpg",

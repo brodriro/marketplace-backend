@@ -15,6 +15,7 @@ import {
 } from './dto/search-products-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateVariantDto } from './dto/update-variant.dto';
+import { buildSkuBase, resolveUniqueSku } from './sku.util';
 
 const VISIBLE_VARIANTS = { where: { visible: true } };
 
@@ -109,6 +110,36 @@ export class ProductsService {
     }
   }
 
+  /**
+   * Resuelve el SKU de una variante. Si `sku` viene explícito, se respeta tal cual (y un choque
+   * termina en `409` más adelante). Si no viene, se autogenera con el esquema canónico
+   * `<slug(producto)>-<slug(color)>` y se le agrega sufijo `-N` si ya está tomado — en la DB o
+   * entre los `reserved` de esta misma operación.
+   */
+  private async resolveVariantSku(
+    productName: string,
+    color: string,
+    sku: string | undefined,
+    reserved: Set<string>,
+  ): Promise<string> {
+    if (sku) {
+      return sku;
+    }
+    return resolveUniqueSku(
+      buildSkuBase(productName, color),
+      async (candidate) => {
+        if (reserved.has(candidate)) {
+          return true;
+        }
+        const existing = await this.prisma.productVariant.findUnique({
+          where: { sku: candidate },
+          select: { id: true },
+        });
+        return existing !== null;
+      },
+    );
+  }
+
   async create(dto: CreateProductDto) {
     const category = await this.prisma.category.findUnique({
       where: { id: dto.categoryId },
@@ -117,6 +148,19 @@ export class ProductsService {
       throw new NotFoundException('Categoría no encontrada');
     }
     await this.assertColorsExist(dto.variants.map((v) => v.color));
+
+    const reserved = new Set<string>();
+    const variantsData: { color: string; sku: string; stock: number }[] = [];
+    for (const v of dto.variants) {
+      const sku = await this.resolveVariantSku(
+        dto.name,
+        v.color,
+        v.sku,
+        reserved,
+      );
+      reserved.add(sku);
+      variantsData.push({ color: v.color, sku, stock: v.stock ?? 0 });
+    }
 
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -129,13 +173,7 @@ export class ProductsService {
             price: dto.price,
             store: dto.store,
             status: dto.status,
-            variants: {
-              create: dto.variants.map((v) => ({
-                color: v.color,
-                sku: v.sku,
-                stock: v.stock ?? 0,
-              })),
-            },
+            variants: { create: variantsData },
           },
           include: { variants: true },
         });
@@ -194,12 +232,19 @@ export class ProductsService {
     }
     await this.assertColorsExist([dto.color]);
 
+    const sku = await this.resolveVariantSku(
+      product.name,
+      dto.color,
+      dto.sku,
+      new Set(),
+    );
+
     try {
       return await this.prisma.productVariant.create({
         data: {
           productId,
           color: dto.color,
-          sku: dto.sku,
+          sku,
           stock: dto.stock ?? 0,
         },
       });
@@ -208,12 +253,44 @@ export class ProductsService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        throw new ConflictException(
-          `Ya existe una variante con SKU ${dto.sku}`,
-        );
+        throw new ConflictException(`Ya existe una variante con SKU ${sku}`);
       }
       throw error;
     }
+  }
+
+  /**
+   * Regenera el SKU de una variante con el esquema canónico a partir del nombre actual del
+   * producto y el color de la variante (+ sufijo `-N` si choca con otra). Pensado para el botón
+   * "regenerar SKU" del panel admin. El SKU actual de la propia variante no cuenta como choque.
+   */
+  async regenerateVariantSku(variantId: string) {
+    const variant = await this.prisma.productVariant.findUnique({
+      where: { id: variantId },
+      include: { product: { select: { name: true } } },
+    });
+    if (!variant || !variant.visible) {
+      throw new NotFoundException('Variante no encontrada');
+    }
+
+    const sku = await resolveUniqueSku(
+      buildSkuBase(variant.product.name, variant.color),
+      async (candidate) => {
+        if (candidate === variant.sku) {
+          return false;
+        }
+        const existing = await this.prisma.productVariant.findUnique({
+          where: { sku: candidate },
+          select: { id: true },
+        });
+        return existing !== null;
+      },
+    );
+
+    return this.prisma.productVariant.update({
+      where: { id: variantId },
+      data: { sku },
+    });
   }
 
   async updateVariant(variantId: string, dto: UpdateVariantDto) {
