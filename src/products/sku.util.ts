@@ -9,7 +9,7 @@
  * Este es el identificador canónico de variante que consumen los clientes A2UI: el componente
  * `VariantSelector` usa `variant.sku` como `value` de cada chip, y el agente conversacional
  * keyea carrito/stock por `sku` + `productId`. No cambiar el formato sin coordinar con
- * `demoCompose` (`mobile`) y `agente-mobile` — ver `documentacion/handoff-integracion-agente.md`.
+ * `demoCompose` (`mobile`) y `agente-mobile` — ver `documentacion/reference/handoff-integracion-agente.md`.
  *
  * `prisma/seed.ts` genera los SKUs del catálogo con {@link buildSkuBase}, así que hay una sola
  * definición del formato.

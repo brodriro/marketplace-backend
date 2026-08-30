@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Documentación
+
+El contexto base está en documentacion/context.md — léelo al empezar cualquier tarea.
+- documentacion/plan.md    — dirección, hitos, decisiones abiertas, coordinación cross-repo
+- documentacion/tasks.md   — tareas activas (todo/doing/blocked) + "retomar acá"
+- documentacion/handoff.md — log de tareas completadas (más reciente arriba)
+Para generar/retomar una tarea: parte de context.md y toma de plan.md / tasks.md lo necesario.
+Al completar una tarea: muévela de tasks.md a handoff.md (entrada nueva arriba: fecha · qué · por qué · archivos clave · follow-ups).
+
 ## Project
 
 NestJS 11 REST backend for a marketplace app (companion to an Android app in a separate
