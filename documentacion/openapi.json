@@ -1,0 +1,1116 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "marketplace-backend API",
+    "version": "1.0.0-M0",
+    "description": "Contrato E2E congelado en M0 (2026-09-06). Ver demoCompose/docs/plan-e2e.md §6.\n\nEste archivo es el **esqueleto** del contrato v1: especifica en detalle las superficies nuevas o modificadas por el plan E2E (auth con refresh, /cart, ciclo de vida del pedido, Notification, pago Stripe) y lista las superficies pre-existentes sin cambios con su forma resumida. En el hito B8 se reemplaza por el JSON generado con @nestjs/swagger desde los decorators (`pnpm run openapi:dump`). El doc humano es documentacion/API.md.\n\nConvención de tipos: los campos Decimal de Prisma (`price`, `total`, `unitPrice`, `lineTotal`, `subtotal`, `value`, `minPurchase`) y los DateTime viajan como **string** en el JSON, no como number.",
+    "x-status": "M0 frozen — no implementado todavía; M1 arranca la implementación"
+  },
+  "servers": [
+    { "url": "http://localhost:5000/v1", "description": "Local (PORT=5000). En emulador Android <host> = 10.0.2.2." },
+    { "url": "https://api.brodriro.dev/v1", "description": "Prod (RDS compartido)" }
+  ],
+  "tags": [
+    { "name": "auth", "description": "Registro, login, refresh y logout. Par access+refresh desde M1." },
+    { "name": "users", "description": "Perfil del usuario autenticado." },
+    { "name": "categories" },
+    { "name": "products" },
+    { "name": "reviews" },
+    { "name": "favorites" },
+    { "name": "cart", "description": "Carrito persistido por usuario. Nuevo en M2. Fuente de verdad única para app y agente." },
+    { "name": "orders", "description": "Pedidos del shopper + ciclo de vida (M4) + pago (M5)." },
+    { "name": "notifications", "description": "Canal de eventos admin→app. Modelo Notification nuevo en M4." },
+    { "name": "banners" },
+    { "name": "promo-codes" },
+    { "name": "webhooks", "description": "Entradas de proveedores externos. No van bajo /v1 ni usan bearer." },
+    { "name": "admin", "description": "Requieren JWT válido + role=admin (RolesGuard). Consumidos por la app Next.js admin/, no por el cliente Android." }
+  ],
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": ["auth"],
+        "operationId": "authRegister",
+        "summary": "Alta de usuario",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterRequest" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Usuario creado. Devuelve el par de tokens (aditivo desde M1: antes sólo `accessToken`).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthTokens" } } }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "409": { "description": "Ya existe una cuenta con ese email", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["auth"],
+        "operationId": "authLogin",
+        "summary": "Login",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Par de tokens.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthTokens" } } }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "description": "Credenciales inválidas o cuenta inactiva (mismo mensaje genérico)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": ["auth"],
+        "operationId": "authRefresh",
+        "summary": "Rotar el par de tokens",
+        "description": "Emite un par nuevo y revoca el refresh presentado. Si el refresh presentado ya estaba revocado (reuso) se revoca toda la familia (`familyId`) → el usuario debe re-loguear. El agente conversacional NO usa este endpoint (no recibe refresh token).",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefreshRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Par nuevo.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthTokens" } } } },
+          "401": { "description": "Refresh inválido, vencido o revocado (incluye reuso detectado)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["auth"],
+        "operationId": "authLogout",
+        "summary": "Revocar el refresh token",
+        "description": "Revoca el refresh presentado (y su familia). El access token sigue siendo válido hasta su `exp` (15m) — no hay denylist de access.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefreshRequest" } } }
+        },
+        "responses": {
+          "204": { "description": "Revocado (idempotente: revocar uno ya revocado también da 204)" }
+        }
+      }
+    },
+    "/me": {
+      "get": {
+        "tags": ["users"],
+        "operationId": "getMe",
+        "summary": "Perfil del usuario autenticado",
+        "description": "Lo usa la app para nombre/id/rol del usuario. También sirve como **fallback de introspección de token** para el agente conversacional: si el borde A2A valida el access token vía `GET /me` (200 = válido, 401 = expirado) en vez de verificar la firma con un secreto compartido, no hace falta compartir el `JWT_SECRET`. Decisión de A4 (M1).",
+        "responses": {
+          "200": { "description": "El usuario (nunca expone `passwordHash`).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/categories": {
+      "get": {
+        "tags": ["categories"],
+        "operationId": "listCategories",
+        "summary": "Catálogo de categorías",
+        "security": [],
+        "responses": {
+          "200": { "description": "Array de categorías.", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Category" } } } } }
+        }
+      }
+    },
+    "/products": {
+      "get": {
+        "tags": ["products"],
+        "operationId": "listProducts",
+        "summary": "Listado paginado por offset",
+        "security": [],
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "default": 1 } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } }
+        ],
+        "responses": {
+          "200": { "description": "Página de productos.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductPage" } } } }
+        }
+      }
+    },
+    "/products/search": {
+      "get": {
+        "tags": ["products"],
+        "operationId": "searchProducts",
+        "summary": "Búsqueda con filtros y paginación por cursor",
+        "description": "Desde M6 `q` matchea también contra `description` (además de `name`), case-insensitive.",
+        "security": [],
+        "parameters": [
+          { "name": "q", "in": "query", "schema": { "type": "string" }, "description": "Busca en `name` y (desde M6) `description`, contains, case-insensitive." },
+          { "name": "category", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "minPrice", "in": "query", "schema": { "type": "number" } },
+          { "name": "maxPrice", "in": "query", "schema": { "type": "number" } },
+          { "name": "color", "in": "query", "schema": { "type": "string" } },
+          { "name": "sortBy", "in": "query", "schema": { "type": "string", "enum": ["price_asc", "price_desc", "newest"], "default": "newest" } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string", "format": "uuid" }, "description": "`nextCursor` de la respuesta anterior." },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultados + cursor.",
+            "content": { "application/json": { "schema": {
+              "type": "object",
+              "required": ["items", "nextCursor"],
+              "properties": {
+                "items": { "type": "array", "items": { "$ref": "#/components/schemas/Product" } },
+                "nextCursor": { "type": "string", "format": "uuid", "nullable": true }
+              }
+            } } }
+          }
+        }
+      }
+    },
+    "/products/{id}": {
+      "get": {
+        "tags": ["products"],
+        "operationId": "getProduct",
+        "summary": "Detalle de producto + rating agregado",
+        "security": [],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Producto con `variants`, `averageRating`, `reviewCount`.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductWithRating" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/products/{id}/alerts": {
+      "post": {
+        "tags": ["products", "notifications"],
+        "operationId": "createStockAlert",
+        "summary": "Suscribirse a un aviso de stock/precio",
+        "description": "Crea una fila `StockAlert` (la suscripción). Cuando el evento ocurre (restock, baja de precio) el backend genera una `Notification` — ver tag notifications.",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateStockAlertRequest" } } } },
+        "responses": {
+          "201": { "description": "La suscripción creada.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StockAlert" } } } },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/products/{productId}/reviews": {
+      "get": {
+        "tags": ["reviews"],
+        "operationId": "listProductReviews",
+        "summary": "Reseñas de un producto",
+        "security": [],
+        "parameters": [{ "name": "productId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Array de reseñas.", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Review" } } } } }
+        }
+      },
+      "post": {
+        "tags": ["reviews"],
+        "operationId": "createProductReview",
+        "summary": "Dejar una reseña (1 por usuario/producto)",
+        "parameters": [{ "name": "productId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateReviewRequest" } } } },
+        "responses": {
+          "201": { "description": "La reseña creada.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Review" } } } },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "description": "El usuario ya reseñó este producto", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/favorites": {
+      "get": {
+        "tags": ["favorites"],
+        "operationId": "listFavorites",
+        "summary": "Favoritos del usuario (con `product` anidado)",
+        "responses": {
+          "200": { "description": "Array de favoritos.", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/FavoriteWithProduct" } } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/favorites/{productId}": {
+      "post": {
+        "tags": ["favorites"],
+        "operationId": "addFavorite",
+        "summary": "Marcar favorito (idempotente)",
+        "parameters": [{ "name": "productId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "El registro de favorito (sin `product`).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Favorite" } } } },
+          "201": { "description": "Idem, primera vez.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Favorite" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["favorites"],
+        "operationId": "removeFavorite",
+        "summary": "Quitar favorito (delete silencioso)",
+        "parameters": [{ "name": "productId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "204": { "description": "Quitado (no falla si no era favorito)" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/cart": {
+      "get": {
+        "tags": ["cart"],
+        "operationId": "getCart",
+        "summary": "Carrito del usuario con precio vivo y totales",
+        "description": "Nuevo en M2. `unitPrice`/`lineTotal`/`subtotal` se recalculan en cada request con el `price` actual del producto — el precio se congela recién en `POST /orders`. Si el usuario no tiene carrito todavía devuelve uno vacío (no 404).",
+        "responses": {
+          "200": { "description": "El carrito.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Cart" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "delete": {
+        "tags": ["cart"],
+        "operationId": "clearCart",
+        "summary": "Vaciar el carrito",
+        "responses": {
+          "200": { "description": "El carrito vacío.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Cart" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/cart/items": {
+      "post": {
+        "tags": ["cart"],
+        "operationId": "addCartItem",
+        "summary": "Agregar (suma a la línea existente)",
+        "description": "Acepta `variantId` **o** `sku` (se resuelve server-side). Si la variante ya está en el carrito, suma `quantity` a la cantidad existente (`@@unique([cartId, variantId])` — nunca crea dos líneas). Acepta `Idempotency-Key` opcional para reintentos del agente.",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKeyOptional" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AddCartItemRequest" } } } },
+        "responses": {
+          "200": { "description": "El carrito actualizado.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Cart" } } } },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "description": "`variantId`/`sku` no existe", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "409": { "description": "`Idempotency-Key` opcional reusada con body distinto.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IdempotencyConflictError" } } } }
+        }
+      }
+    },
+    "/cart/items/{variantId}": {
+      "patch": {
+        "tags": ["cart"],
+        "operationId": "updateCartItem",
+        "summary": "Fijar cantidad absoluta (0 = borra la línea)",
+        "parameters": [{ "name": "variantId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateCartItemRequest" } } } },
+        "responses": {
+          "200": { "description": "El carrito actualizado.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Cart" } } } },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "description": "La variante no está en el carrito", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "delete": {
+        "tags": ["cart"],
+        "operationId": "removeCartItem",
+        "summary": "Quitar una línea",
+        "parameters": [{ "name": "variantId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "El carrito actualizado.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Cart" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/cart/merge": {
+      "post": {
+        "tags": ["cart"],
+        "operationId": "mergeCart",
+        "summary": "Merge del carrito local al del server (login)",
+        "description": "Unión de líneas; para cada variante `quantity = max(local, server)`. Idempotente: reintentar el merge no infla cantidades. El cliente limpia su carrito local tras el 200.",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKeyOptional" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MergeCartRequest" } } } },
+        "responses": {
+          "200": { "description": "El carrito mergeado.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Cart" } } } },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "409": { "description": "`Idempotency-Key` opcional reusada con body distinto.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IdempotencyConflictError" } } } }
+        }
+      }
+    },
+    "/orders": {
+      "get": {
+        "tags": ["orders"],
+        "operationId": "listOrders",
+        "summary": "Mis pedidos",
+        "description": "Pedidos del usuario autenticado, más nuevos primero. Cada line item trae `variant` acotado a `{ color, sku }`.",
+        "responses": {
+          "200": { "description": "Array de pedidos.", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Order" } } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["orders"],
+        "operationId": "createOrder",
+        "summary": "Crear pedido (+ PaymentIntent desde M5)",
+        "description": "Corre en una transacción: valida stock por variante, descuenta stock y congela `total` con el `price` del momento. Si algún ítem no tiene stock, no persiste nada (`409` con `insufficientStockSkus`).\n\nDesde M5 (`PAYMENTS_ENABLED=true`): crea el pedido en `pending_payment` y un Stripe PaymentIntent; el carrito NO se vacía acá (se vacía en la transición a `paid`). Antes de M5: el pedido queda en `pending_payment` sin PaymentIntent y el carrito se vacía al crear.\n\n`Idempotency-Key`: obligatoria (warn-only hasta M5, `400` si falta desde M5). Key **client-origin**, estable entre reintentos, alcance `(userId, key)`. Misma key + mismo body → replay de la respuesta guardada. Misma key + body distinto → `409`.",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKeyRequired" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateOrderRequest" } } } },
+        "responses": {
+          "201": { "description": "El pedido creado + info de pago.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateOrderResponse" } } } },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "description": "Algún `variantId` no existe", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "409": {
+            "description": "Dos casos distinguibles por la presencia de `insufficientStockSkus`:\n- **presente** → stock insuficiente (`InsufficientStockError`); reintentable ajustando cantidades.\n- **ausente** → `Idempotency-Key` reusada con un body distinto (`IdempotencyConflictError`); bug del cliente, NO reintentar con otro body bajo la misma key.",
+            "content": { "application/json": { "schema": { "oneOf": [
+              { "$ref": "#/components/schemas/InsufficientStockError" },
+              { "$ref": "#/components/schemas/IdempotencyConflictError" }
+            ] } } }
+          }
+        }
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "tags": ["orders"],
+        "operationId": "getOrder",
+        "summary": "Detalle de pedido con timeline real",
+        "description": "Desde M4 `timeline` sale de `OrderStatusHistory` (ya no es sintético) pero mantiene la forma `[{status, at}]` (+`actorType` opcional). Items con `variant.product` expandido. `404` tanto si no existe como si es de otro usuario (sin leak ownership-vs-inexistencia).",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "El pedido con `items[].variant.product` y `timeline`.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderDetail" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/orders/{id}/cancel": {
+      "post": {
+        "tags": ["orders"],
+        "operationId": "cancelOrder",
+        "summary": "Cancelar mi pedido (sólo en pending_payment)",
+        "description": "Nuevo en M4. El buyer sólo puede cancelar su propio pedido mientras está en `pending_payment`. Restock de las variantes. Cualquier otro estado → `409`.",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": { "required": false, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CancelOrderRequest" } } } },
+        "responses": {
+          "200": { "description": "El pedido en `cancelled`.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Order" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "description": "El pedido no está en `pending_payment`.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TransitionError" } } } }
+        }
+      }
+    },
+    "/orders/{id}/confirm": {
+      "post": {
+        "tags": ["orders"],
+        "operationId": "confirmOrderDemo",
+        "summary": "Fallback de demo: forzar pending_payment → paid",
+        "description": "Nuevo en M5. Sólo habilitado con `STRIPE_DEMO_CONFIRM=true`. Hace `paymentIntents.retrieve`; si está `succeeded` (o en modo demo puro) transiciona el pedido a `paid`, escribe historial (`actorType:system`), vacía el carrito y genera la `Notification`. Cubre el caso 'el webhook de Stripe no llega a localhost'. Deshabilitado → `404`.",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "El pedido en `paid`.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Order" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "description": "Pedido inexistente/ajeno, o `STRIPE_DEMO_CONFIRM` off.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "409": { "description": "El pedido no está en `pending_payment`, o el PaymentIntent no está `succeeded`.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TransitionError" } } } }
+        }
+      }
+    },
+    "/notifications": {
+      "get": {
+        "tags": ["notifications"],
+        "operationId": "listNotifications",
+        "summary": "Notificaciones del usuario",
+        "description": "Desde M4 lee el modelo `Notification` (no más `StockAlert` directo). Mantiene `product` y un `notified` espejo poblados para los tipos de stock durante la transición (back-compat con la app v0).\n\nArray plano, más nuevas primero, sin paginar — suficiente para el volumen actual (la app lo consume tal cual). Si el volumen crece se agregará `?limit` / `?cursor` de forma aditiva; no bloquea M4.",
+        "responses": {
+          "200": { "description": "Array de notificaciones, más nuevas primero.", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Notification" } } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/notifications/{id}/read": {
+      "patch": {
+        "tags": ["notifications"],
+        "operationId": "markNotificationRead",
+        "summary": "Marcar una notificación como leída",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "La notificación actualizada (`read: true`).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Notification" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/notifications/read-all": {
+      "post": {
+        "tags": ["notifications"],
+        "operationId": "markAllNotificationsRead",
+        "summary": "Marcar todas como leídas",
+        "description": "Nuevo en M4.",
+        "responses": {
+          "200": { "description": "Cantidad marcada.", "content": { "application/json": { "schema": { "type": "object", "properties": { "updated": { "type": "integer" } }, "required": ["updated"] } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/banners": {
+      "get": {
+        "tags": ["banners"],
+        "operationId": "listBanners",
+        "summary": "Banners promocionales activos",
+        "security": [],
+        "responses": {
+          "200": { "description": "Array de banners, ordenados por `sortOrder` asc.", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Banner" } } } } }
+        }
+      }
+    },
+    "/promo-codes/{code}": {
+      "get": {
+        "tags": ["promo-codes"],
+        "operationId": "getPromoCode",
+        "summary": "Validar un código de descuento",
+        "description": "Sólo validación — el backend NO aplica el descuento en `POST /orders`. `:code` case-insensitive. `404` si no existe o si `now` está fuera de `[validFrom, validUntil]`.",
+        "security": [],
+        "parameters": [{ "name": "code", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "El código válido.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PromoCode" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/webhooks/stripe": {
+      "post": {
+        "tags": ["webhooks"],
+        "operationId": "stripeWebhook",
+        "summary": "Entrada de eventos de Stripe (payment_intent.succeeded)",
+        "description": "Nuevo en M5. **Montado en `/webhooks/stripe`, sin el prefijo `/v1`.** Sin bearer: se autentica verificando la firma `Stripe-Signature` contra `STRIPE_WEBHOOK_SECRET` sobre el body crudo (la ruta se excluye del body-parser JSON, `rawBody:true`). En `payment_intent.succeeded` busca el pedido por `metadata.orderId`, transiciona `pending_payment → paid` (`actorType:system`), vacía el carrito y genera la `Notification`.",
+        "servers": [{ "url": "http://localhost:5000", "description": "Sin prefijo /v1" }, { "url": "https://api.brodriro.dev" }],
+        "security": [],
+        "parameters": [{ "name": "Stripe-Signature", "in": "header", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "description": "Event de Stripe (raw). No se parsea como JSON tipado hasta verificar la firma." } } } },
+        "responses": {
+          "200": { "description": "Recibido (Stripe reintenta si no es 2xx)." },
+          "400": { "description": "Firma inválida o payload no verificable." }
+        }
+      }
+    },
+    "/admin/products": {
+      "get": {
+        "tags": ["admin"],
+        "operationId": "adminListProducts",
+        "summary": "Listado admin de productos",
+        "description": "Query `page`, `pageSize`, `category`. Misma forma que `GET /products`. Sin cambios en M0 — ver documentacion/API.md §Admin.",
+        "responses": { "200": { "description": "Página de productos.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductPage" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      },
+      "post": {
+        "tags": ["admin"],
+        "operationId": "adminCreateProduct",
+        "summary": "Crear producto + variantes",
+        "description": "Body `{ categoryId, name, description, image?, price, store, status?, variants:[{ color, sku?, stock? }] }`. `sku` opcional (autogenerado). Sin cambios en M0 — ver documentacion/API.md §Admin.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } },
+        "responses": { "201": { "description": "El producto creado.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductWithRating" } } } }, "400": { "$ref": "#/components/responses/ValidationError" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "description": "Nombre o sku duplicado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } } }
+      }
+    },
+    "/admin/products/{id}": {
+      "get": { "tags": ["admin"], "operationId": "adminGetProduct", "summary": "Detalle admin de producto", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "El producto.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductWithRating" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } } },
+      "patch": { "tags": ["admin"], "operationId": "adminUpdateProduct", "summary": "Editar producto (parcial)", "description": "Subconjunto de `categoryId/name/description/image/price/store/status`. Renombrar NO reescribe los sku. Sin cambios en M0.", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } }, "responses": { "200": { "description": "El producto actualizado.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductWithRating" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } } },
+      "delete": { "tags": ["admin"], "operationId": "adminDeleteProduct", "summary": "Borrado lógico de producto", "description": "UPDATE `visible=false`, no DELETE físico. Sin cambios en M0.", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "204": { "description": "Borrado lógico aplicado" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } } }
+    },
+    "/admin/products/{id}/variants": {
+      "post": { "tags": ["admin"], "operationId": "adminAddVariant", "summary": "Agregar variante", "description": "Body `{ color, sku?, stock? }`. Sin cambios en M0.", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } }, "responses": { "201": { "description": "La variante creada.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductVariant" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "description": "sku duplicado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } } } }
+    },
+    "/admin/products/{id}/variants/{variantId}": {
+      "patch": { "tags": ["admin"], "operationId": "adminUpdateVariant", "summary": "Editar variante", "description": "Subconjunto de `color/sku/stock`. Sin cambios en M0. **Nota E2E**: subir `stock` de 0 → >0 dispara `Notification back_in_stock` a los suscriptores (M4/B5).", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }, { "name": "variantId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } }, "responses": { "200": { "description": "La variante actualizada.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductVariant" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "description": "sku duplicado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } } } },
+      "delete": { "tags": ["admin"], "operationId": "adminDeleteVariant", "summary": "Borrado lógico de variante", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }, { "name": "variantId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "204": { "description": "Borrado lógico aplicado" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } } }
+    },
+    "/admin/products/{id}/variants/{variantId}/regenerate-sku": {
+      "post": { "tags": ["admin"], "operationId": "adminRegenerateSku", "summary": "Regenerar el sku de una variante", "description": "Esquema canónico `<slug(nombre)>-<slug(color)>` (+ sufijo `-N`). Sin cambios en M0.", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }, { "name": "variantId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "La variante con el sku nuevo.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductVariant" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } } }
+    },
+    "/admin/categories": {
+      "get": { "tags": ["admin"], "operationId": "adminListCategories", "summary": "Categorías (sin paginar)", "responses": { "200": { "description": "Array de categorías.", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Category" } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } } },
+      "post": { "tags": ["admin"], "operationId": "adminCreateCategory", "summary": "Crear categoría", "description": "Body `{ name, subtitle?, image? }`. Sin cambios en M0.", "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } }, "responses": { "201": { "description": "La categoría creada.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Category" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "409": { "description": "name duplicado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } } } }
+    },
+    "/admin/categories/{id}": {
+      "get": { "tags": ["admin"], "operationId": "adminGetCategory", "summary": "Una categoría", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "La categoría.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Category" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } } },
+      "patch": { "tags": ["admin"], "operationId": "adminUpdateCategory", "summary": "Editar categoría (parcial)", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } }, "responses": { "200": { "description": "La categoría actualizada.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Category" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "description": "name duplicado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } } } },
+      "delete": { "tags": ["admin"], "operationId": "adminDeleteCategory", "summary": "Borrado físico de categoría", "description": "`Category` no tiene `visible` → DELETE real. `409` si tiene productos asociados.", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "204": { "description": "Eliminada" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "description": "La categoría tiene productos", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } } } }
+    },
+    "/admin/banners": {
+      "get": { "tags": ["admin"], "operationId": "adminListBanners", "summary": "Banners (paginado, incluye inactivos)", "responses": { "200": { "description": "Página de banners.", "content": { "application/json": { "schema": { "type": "object" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } } },
+      "post": { "tags": ["admin"], "operationId": "adminCreateBanner", "summary": "Crear banner", "description": "Body `{ store, description, image, active?, sortOrder? }`. Sin cambios en M0.", "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } }, "responses": { "201": { "description": "El banner creado.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Banner" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } } }
+    },
+    "/admin/banners/{id}": {
+      "get": { "tags": ["admin"], "operationId": "adminGetBanner", "summary": "Un banner", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "El banner.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Banner" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } } },
+      "patch": { "tags": ["admin"], "operationId": "adminUpdateBanner", "summary": "Editar banner (parcial)", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } }, "responses": { "200": { "description": "El banner actualizado.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Banner" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } } },
+      "delete": { "tags": ["admin"], "operationId": "adminDeleteBanner", "summary": "Borrado lógico de banner", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "204": { "description": "Borrado lógico aplicado" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } } }
+    },
+    "/admin/orders": {
+      "get": {
+        "tags": ["admin"],
+        "operationId": "adminListOrders",
+        "summary": "Pedidos de todos los usuarios",
+        "description": "Query `page`, `pageSize`, `status`. Incluye `user` (sin `passwordHash`). Desde M4 el filtro `status` acepta el enum completo de 7 estados.",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "default": 1 } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } },
+          { "name": "status", "in": "query", "schema": { "$ref": "#/components/schemas/OrderStatus" } }
+        ],
+        "responses": { "200": { "description": "Página de pedidos con `user`.", "content": { "application/json": { "schema": { "type": "object" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/admin/orders/{id}": {
+      "get": { "tags": ["admin"], "operationId": "adminGetOrder", "summary": "Detalle admin de pedido", "description": "Como `GET /orders/:id` + `user`; `404` simple (sin enmascarado ownership).", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "El pedido con `user`, `items[].variant.product`, `timeline`.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderDetail" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } } }
+    },
+    "/admin/orders/{id}/status": {
+      "patch": {
+        "tags": ["admin"],
+        "operationId": "adminUpdateOrderStatus",
+        "summary": "Transicionar el estado de un pedido / setear tracking",
+        "description": "**Cambia en M4**: de 'sólo avanza en la cadena lineal' (`400` al retroceder) a la matriz de transiciones de §6.3. `preparing → shipped` exige `trackingNumber` + `trackingCarrier`. Una transición fuera de la matriz → `409` con `allowedTransitions`. Cada transición escribe una fila en `OrderStatusHistory` (`actorType:admin`) y puede generar una `Notification order_status_changed` al dueño. `trackingNumber`/`trackingCarrier` se pueden setear sin cambiar el estado.",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminUpdateOrderStatusRequest" } } } },
+        "responses": {
+          "200": { "description": "El pedido actualizado.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Order" } } } },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "description": "Transición no permitida por la matriz.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TransitionError" } } } }
+        }
+      }
+    },
+    "/admin/users": {
+      "get": { "tags": ["admin"], "operationId": "adminListUsers", "summary": "Usuarios (nunca expone passwordHash)", "parameters": [{ "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "default": 1 } }, { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } }], "responses": { "200": { "description": "Página de usuarios.", "content": { "application/json": { "schema": { "type": "object" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } } }
+    },
+    "/admin/users/{id}": {
+      "get": { "tags": ["admin"], "operationId": "adminGetUser", "summary": "Un usuario", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "El usuario.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } } },
+      "patch": { "tags": ["admin"], "operationId": "adminUpdateUser", "summary": "Editar usuario", "description": "Subconjunto de `{ email, name, avatarUrl }`. Sin cambios en M0.", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } }, "responses": { "200": { "description": "El usuario actualizado.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } } }
+    },
+    "/admin/users/{id}/role": {
+      "patch": { "tags": ["admin"], "operationId": "adminUpdateUserRole", "summary": "Cambiar el rol de un usuario", "description": "Body `{ role: \"user\" | \"admin\" }`. `400` si el admin autenticado intenta revocarse el propio rol.", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["role"], "properties": { "role": { "$ref": "#/components/schemas/Role" } } } } } }, "responses": { "200": { "description": "El usuario actualizado.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } }, "400": { "$ref": "#/components/responses/ValidationError" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } } }
+    },
+    "/admin/users/{id}/active": {
+      "patch": { "tags": ["admin"], "operationId": "adminUpdateUserActive", "summary": "Activar/desactivar un usuario", "description": "Body `{ active: boolean }`. `400` si el admin intenta desactivarse a sí mismo. Un usuario `active:false` no puede loguearse. **Nota E2E**: desactivar un usuario revoca todas sus familias de refresh token (M1/B1).", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["active"], "properties": { "active": { "type": "boolean" } } } } } }, "responses": { "200": { "description": "El usuario actualizado.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } }, "400": { "$ref": "#/components/responses/ValidationError" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } } }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Access token JWT (HS256), TTL 15m. Claims: `{ sub, email, role, typ:\"access\", iat, exp }`. Al 401 el cliente rota con `POST /auth/refresh`. El agente conversacional verifica este token (JWKS/secreto compartido) y no recibe refresh."
+      }
+    },
+    "parameters": {
+      "IdempotencyKeyRequired": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "maxLength": 255 },
+        "description": "Clave de idempotencia client-origin, estable entre reintentos del mismo turno lógico. Alcance `(userId, key)`, TTL 24h. Obligatoria desde M5 (`400` si falta); warn-only antes."
+      },
+      "IdempotencyKeyOptional": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": false,
+        "schema": { "type": "string", "maxLength": 255 },
+        "description": "Opcional. Si se envía, protege contra reintentos duplicados con la misma semántica que en `POST /orders`."
+      }
+    },
+    "responses": {
+      "ValidationError": {
+        "description": "Body/query inválido (class-validator). `message` puede ser `string[]`, uno por campo.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Unauthorized": {
+        "description": "Falta el bearer, o es inválido/vencido.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Forbidden": {
+        "description": "Bearer válido pero `role` insuficiente (se requiere `admin`).",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "NotFound": {
+        "description": "El recurso no existe (o no pertenece al usuario, en endpoints con enmascarado).",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "description": "Formato estándar de Nest (`ValidationPipe`/`HttpException`).",
+        "required": ["statusCode", "message"],
+        "properties": {
+          "statusCode": { "type": "integer", "example": 400 },
+          "message": {
+            "oneOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" } }],
+            "example": "email must be an email"
+          },
+          "error": { "type": "string", "example": "Bad Request" }
+        }
+      },
+      "InsufficientStockError": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Error" },
+          {
+            "type": "object",
+            "description": "`409` de `POST /orders` por falta de stock. Campo estructurado nuevo (antes sólo el texto `Stock insuficiente para <sku>`). La presencia de `insufficientStockSkus` es lo que distingue este `409` del de conflicto de idempotencia.",
+            "required": ["insufficientStockSkus"],
+            "properties": {
+              "insufficientStockSkus": { "type": "array", "items": { "type": "string" }, "example": ["wireless-mouse-blue"] }
+            }
+          }
+        ]
+      },
+      "IdempotencyConflictError": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Error" },
+          {
+            "type": "object",
+            "description": "`409` cuando una `Idempotency-Key` ya usada se reenvía con un body distinto (alcance `(userId, key)`). Error plano, SIN `insufficientStockSkus`. No es reintentable: el cliente debe usar una key nueva para un request nuevo, o el mismo body para obtener el replay. Aplica a `POST /orders` y a `POST /cart/items` / `POST /cart/merge` cuando mandan el header opcional.",
+            "properties": {
+              "error": { "type": "string", "example": "Conflict" },
+              "message": { "type": "string", "example": "Idempotency-Key ya usada con un body distinto" }
+            }
+          }
+        ]
+      },
+      "TransitionError": {
+        "type": "object",
+        "description": "`409` de una transición de estado de pedido no permitida.",
+        "required": ["statusCode", "error"],
+        "properties": {
+          "statusCode": { "type": "integer", "example": 409 },
+          "error": { "type": "string", "example": "Transición no permitida" },
+          "message": { "type": "string", "example": "No se puede pasar de delivered a shipped" },
+          "from": { "$ref": "#/components/schemas/OrderStatus" },
+          "to": { "$ref": "#/components/schemas/OrderStatus" },
+          "allowedTransitions": { "type": "array", "items": { "$ref": "#/components/schemas/OrderStatus" }, "example": ["refunded"] }
+        }
+      },
+      "Money": {
+        "type": "string",
+        "description": "Decimal serializado como string (nunca number). Dos decimales.",
+        "example": "199.99"
+      },
+      "Role": { "type": "string", "enum": ["user", "admin"] },
+      "RegisterRequest": {
+        "type": "object",
+        "required": ["email", "password", "name"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "minLength": 8 },
+          "name": { "type": "string", "minLength": 1 }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string" }
+        }
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "required": ["refreshToken"],
+        "properties": { "refreshToken": { "type": "string" } }
+      },
+      "AuthTokens": {
+        "type": "object",
+        "required": ["accessToken", "refreshToken", "expiresIn"],
+        "description": "Par de tokens. `accessToken` estaba desde v0; `refreshToken` y `expiresIn` son aditivos desde M1.",
+        "properties": {
+          "accessToken": { "type": "string", "description": "JWT HS256, TTL 15m." },
+          "refreshToken": { "type": "string", "description": "Opaco (32B base64url), TTL 30d. Se rota en cada `POST /auth/refresh`." },
+          "expiresIn": { "type": "integer", "description": "Segundos de vida del access token (para refresh preventivo).", "example": 900 }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "email": { "type": "string", "format": "email" },
+          "name": { "type": "string" },
+          "avatarUrl": { "type": "string", "nullable": true },
+          "role": { "$ref": "#/components/schemas/Role" },
+          "active": { "type": "boolean" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "subtitle": { "type": "string", "nullable": true },
+          "image": { "type": "string", "nullable": true }
+        }
+      },
+      "ProductVariant": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "productId": { "type": "string", "format": "uuid" },
+          "color": { "type": "string", "description": "String plano, validado contra el catálogo `Color` en el DTO (no es FK)." },
+          "sku": { "type": "string", "description": "Identificador estable de la variante: `<slug(nombre)>-<slug(color)>`, `[a-z0-9-]`. Opaco — no parsearlo.", "example": "wireless-mouse-blue" },
+          "stock": { "type": "integer" }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "categoryId": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "image": { "type": "string", "nullable": true },
+          "price": { "$ref": "#/components/schemas/Money" },
+          "store": { "type": "string" },
+          "status": { "type": "string", "enum": ["Hot", "New", "Normal", "Popular"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "variants": { "type": "array", "items": { "$ref": "#/components/schemas/ProductVariant" } }
+        }
+      },
+      "ProductWithRating": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Product" },
+          {
+            "type": "object",
+            "properties": {
+              "averageRating": { "type": "number", "description": "0 si no tiene reseñas.", "example": 4.3 },
+              "reviewCount": { "type": "integer" }
+            }
+          }
+        ]
+      },
+      "ProductPage": {
+        "type": "object",
+        "required": ["items", "page", "pageSize", "total"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/Product" } },
+          "page": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "total": { "type": "integer" }
+        }
+      },
+      "Review": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "productId": { "type": "string", "format": "uuid" },
+          "userId": { "type": "string", "format": "uuid" },
+          "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "comment": { "type": "string", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateReviewRequest": {
+        "type": "object",
+        "required": ["rating"],
+        "properties": {
+          "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "comment": { "type": "string" }
+        }
+      },
+      "Favorite": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "string", "format": "uuid" },
+          "productId": { "type": "string", "format": "uuid" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "FavoriteWithProduct": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Favorite" },
+          { "type": "object", "properties": { "product": { "$ref": "#/components/schemas/Product" } } }
+        ]
+      },
+      "CartItem": {
+        "type": "object",
+        "description": "Línea del carrito con precio vivo (recalculado en cada `GET /cart`).",
+        "required": ["variantId", "sku", "productId", "quantity", "unitPrice", "lineTotal"],
+        "properties": {
+          "variantId": { "type": "string", "format": "uuid" },
+          "sku": { "type": "string", "example": "wireless-mouse-blue" },
+          "productId": { "type": "string", "format": "uuid" },
+          "name": { "type": "string", "description": "Snapshot para pintar la fila sin otra request." },
+          "color": { "type": "string" },
+          "image": { "type": "string", "nullable": true },
+          "quantity": { "type": "integer", "minimum": 1 },
+          "unitPrice": { "$ref": "#/components/schemas/Money" },
+          "lineTotal": { "$ref": "#/components/schemas/Money" }
+        }
+      },
+      "Cart": {
+        "type": "object",
+        "required": ["items", "itemCount", "subtotal"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/CartItem" } },
+          "itemCount": { "type": "integer", "description": "Suma de `quantity` de todas las líneas." },
+          "subtotal": { "$ref": "#/components/schemas/Money" }
+        }
+      },
+      "AddCartItemRequest": {
+        "type": "object",
+        "required": ["quantity"],
+        "description": "Exactamente uno de `variantId` o `sku`.",
+        "properties": {
+          "variantId": { "type": "string", "format": "uuid" },
+          "sku": { "type": "string" },
+          "quantity": { "type": "integer", "minimum": 1, "description": "Se SUMA a la cantidad existente de esa variante." }
+        }
+      },
+      "UpdateCartItemRequest": {
+        "type": "object",
+        "required": ["quantity"],
+        "properties": {
+          "quantity": { "type": "integer", "minimum": 0, "description": "Cantidad ABSOLUTA. `0` borra la línea." }
+        }
+      },
+      "MergeCartRequest": {
+        "type": "object",
+        "required": ["items"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["quantity"],
+              "properties": {
+                "variantId": { "type": "string", "format": "uuid" },
+                "sku": { "type": "string" },
+                "quantity": { "type": "integer", "minimum": 1 }
+              }
+            }
+          }
+        }
+      },
+      "OrderStatus": {
+        "type": "string",
+        "description": "Ciclo de vida del pedido (M4). Reemplaza el enum v0 `pending_payment|processing|shipped|delivered` — `processing` se renombra a `preparing`.",
+        "enum": ["pending_payment", "paid", "preparing", "shipped", "delivered", "cancelled", "refunded"]
+      },
+      "OrderItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "orderId": { "type": "string", "format": "uuid" },
+          "variantId": { "type": "string", "format": "uuid" },
+          "quantity": { "type": "integer" },
+          "unitPrice": { "$ref": "#/components/schemas/Money" },
+          "variant": {
+            "type": "object",
+            "description": "Acotado en listados; expandido con `product` en `GET /orders/:id`.",
+            "properties": {
+              "color": { "type": "string" },
+              "sku": { "type": "string" }
+            }
+          }
+        }
+      },
+      "OrderItemExpanded": {
+        "allOf": [
+          { "$ref": "#/components/schemas/OrderItem" },
+          {
+            "type": "object",
+            "properties": {
+              "variant": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "color": { "type": "string" },
+                  "sku": { "type": "string" },
+                  "stock": { "type": "integer" },
+                  "product": { "$ref": "#/components/schemas/Product" }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "OrderTimelineEntry": {
+        "type": "object",
+        "required": ["status", "at"],
+        "properties": {
+          "status": { "$ref": "#/components/schemas/OrderStatus" },
+          "at": { "type": "string", "format": "date-time" },
+          "actorType": { "type": "string", "enum": ["system", "admin", "buyer"], "description": "Opcional. Origen de la transición." }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "userId": { "type": "string", "format": "uuid" },
+          "status": { "$ref": "#/components/schemas/OrderStatus" },
+          "total": { "$ref": "#/components/schemas/Money" },
+          "shippingCity": { "type": "string" },
+          "etaDays": { "type": "integer", "example": 5 },
+          "trackingNumber": { "type": "string", "nullable": true },
+          "trackingCarrier": { "type": "string", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/OrderItem" } }
+        }
+      },
+      "OrderDetail": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Order" },
+          {
+            "type": "object",
+            "properties": {
+              "items": { "type": "array", "items": { "$ref": "#/components/schemas/OrderItemExpanded" } },
+              "timeline": { "type": "array", "items": { "$ref": "#/components/schemas/OrderTimelineEntry" } }
+            }
+          }
+        ]
+      },
+      "CreateOrderRequest": {
+        "type": "object",
+        "required": ["shippingCity", "items"],
+        "properties": {
+          "shippingCity": { "type": "string" },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["variantId", "quantity"],
+              "properties": {
+                "variantId": { "type": "string", "format": "uuid" },
+                "quantity": { "type": "integer", "minimum": 1 }
+              }
+            }
+          },
+          "discountCode": { "type": "string", "description": "Opcional. El backend valida y aplica el descuento al cotizar el `total` (a coordinar en M5 — hoy el descuento lo calcula el cliente)." }
+        }
+      },
+      "PaymentInfo": {
+        "type": "object",
+        "description": "Presente desde M5 (`PAYMENTS_ENABLED=true`). Null/ausente antes.",
+        "properties": {
+          "provider": { "type": "string", "enum": ["stripe"] },
+          "clientSecret": { "type": "string", "description": "PaymentIntent client secret para confirmar con Stripe Payment Sheet." },
+          "publishableKey": { "type": "string", "description": "Clave publicable de Stripe (evita un endpoint de config aparte)." }
+        }
+      },
+      "CreateOrderResponse": {
+        "type": "object",
+        "required": ["order"],
+        "properties": {
+          "order": { "$ref": "#/components/schemas/Order" },
+          "payment": { "$ref": "#/components/schemas/PaymentInfo" }
+        }
+      },
+      "CancelOrderRequest": {
+        "type": "object",
+        "properties": { "reason": { "type": "string" } }
+      },
+      "AdminUpdateOrderStatusRequest": {
+        "type": "object",
+        "description": "Al menos uno de los campos. `status` debe ser una transición válida desde el estado actual (matriz §6.3).",
+        "properties": {
+          "status": { "$ref": "#/components/schemas/OrderStatus" },
+          "trackingNumber": { "type": "string" },
+          "trackingCarrier": { "type": "string" },
+          "reason": { "type": "string", "description": "Requerido para `refunded` y recomendado para `cancelled`." }
+        }
+      },
+      "CreateStockAlertRequest": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": { "type": "string", "enum": ["back_in_stock", "price_drop"] }
+        }
+      },
+      "StockAlert": {
+        "type": "object",
+        "description": "La SUSCRIPCIÓN ('avisame cuando…'). La ENTREGA del evento es una `Notification`.",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "userId": { "type": "string", "format": "uuid" },
+          "productId": { "type": "string", "format": "uuid" },
+          "type": { "type": "string", "enum": ["back_in_stock", "price_drop"] },
+          "notified": { "type": "boolean", "description": "Se pone `true` cuando el evento suscrito se disparó y se generó la `Notification`." },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "NotificationType": {
+        "type": "string",
+        "enum": ["order_status_changed", "back_in_stock", "price_drop"]
+      },
+      "DeepLink": {
+        "type": "object",
+        "required": ["type", "id"],
+        "properties": {
+          "type": { "type": "string", "enum": ["order", "product"] },
+          "id": { "type": "string", "format": "uuid" }
+        }
+      },
+      "Notification": {
+        "type": "object",
+        "description": "Evento entregado al usuario (modelo `Notification`, M4). El canal admin→app: sin push, la app hace pull.",
+        "required": ["id", "type", "title", "body", "read", "createdAt", "deepLink"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "type": { "$ref": "#/components/schemas/NotificationType" },
+          "title": { "type": "string" },
+          "body": { "type": "string" },
+          "read": { "type": "boolean", "description": "Derivado de `readAt != null`." },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "deepLink": { "$ref": "#/components/schemas/DeepLink" },
+          "data": {
+            "type": "object",
+            "description": "Campos según `type`.",
+            "properties": {
+              "fromStatus": { "$ref": "#/components/schemas/OrderStatus" },
+              "toStatus": { "$ref": "#/components/schemas/OrderStatus" },
+              "trackingNumber": { "type": "string" },
+              "carrier": { "type": "string" },
+              "oldPrice": { "$ref": "#/components/schemas/Money" },
+              "newPrice": { "$ref": "#/components/schemas/Money" },
+              "sku": { "type": "string" }
+            }
+          },
+          "product": {
+            "allOf": [{ "$ref": "#/components/schemas/Product" }],
+            "nullable": true,
+            "description": "Sólo poblado en `back_in_stock`/`price_drop` (back-compat con la app v0). `null` en `order_status_changed`."
+          },
+          "notified": { "type": "boolean", "description": "Espejo temporal de `read` para back-compat con la app v0. Se retira cuando la app migra a `read`." }
+        }
+      },
+      "Banner": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "store": { "type": "string" },
+          "description": { "type": "string" },
+          "image": { "type": "string" },
+          "active": { "type": "boolean" },
+          "sortOrder": { "type": "integer" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "PromoCode": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string", "example": "WELCOME10" },
+          "type": { "type": "string", "enum": ["percentage", "fixed_amount"] },
+          "value": { "$ref": "#/components/schemas/Money" },
+          "appliesToCategory": { "type": "string", "format": "uuid", "nullable": true },
+          "minPurchase": { "$ref": "#/components/schemas/Money" },
+          "validFrom": { "type": "string", "format": "date-time" },
+          "validUntil": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

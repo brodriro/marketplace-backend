@@ -4,6 +4,160 @@ Documentación generada a partir del código real (`src/**/*.controller.ts`, `*.
 `*.dto.ts`, `prisma/schema.prisma`), no del plan original — es la fuente de verdad para
 implementar cualquier cliente (Android incluido).
 
+Todo lo que sigue describe la **versión actual (v0)** en `master`. La sección de abajo resume el
+contrato **v1** (plan E2E) que todavía no está implementado.
+
+---
+
+## Próxima versión (v1) — contrato E2E congelado (M0, 2026-09-06)
+
+> Estado: **congelado, sin implementar.** La implementación arranca en M1. El contrato máquina
+> completo está en [`openapi.json`](openapi.json) (OpenAPI 3.0.3, esqueleto — en B8 se reemplaza por
+> el JSON que genera `@nestjs/swagger`). El plan y los hitos: `demoCompose/docs/plan-e2e.md` §6.
+> Esta sección lista sólo los **deltas** contra la v0 documentada más abajo.
+
+### Base path
+
+Todas las rutas se sirven bajo **`/v1/...`** (`app.enableVersioning({ type: URI })`) **y también sin
+prefijo** durante el cutover (`VERSION_NEUTRAL`) — se remueve el alias sin versión en M8, cuando app
+y agente estén en `/v1`. `GET /docs` (Swagger UI) + `GET /openapi.json` llegan en B8. Breaking
+futuro → `/v2`. **Excepción:** `POST /webhooks/stripe` se monta sin el prefijo `/v1`.
+
+### Auth: par access + refresh — ✅ implementado (M1, rama `feat/e2e-m1-auth-refresh`)
+
+- `accessToken` JWT HS256, claims `{ sub, email, role, typ: "access", iat, exp }`, **TTL 15m**
+  (`JWT_ACCESS_EXPIRES_IN`).
+- `refreshToken` **opaco** (32B base64url), **TTL 30d** (`JWT_REFRESH_EXPIRES_IN`), guardado
+  hasheado (sha256) en tabla `refresh_tokens` (`RefreshToken { userId, tokenHash, familyId,
+  expiresAt, revokedAt?, replacedById?, userAgent?, createdAt }`, migración
+  `20260906222633_add_refresh_token`).
+- `POST /auth/login` (`200`) y `POST /auth/register` (`201`) devuelven
+  `{ accessToken, refreshToken, expiresIn }` — **aditivo**: `accessToken` sigue estando, los
+  clientes v0 no se rompen. `expiresIn` = segundos del access (para refresh preventivo).
+- `POST /auth/refresh { refreshToken }` → `200` con par nuevo; **rota** (revoca el presentado,
+  setea `replacedById`). Presentar un refresh desconocido/vencido → `401`. Presentar uno ya
+  revocado (reuso) → se revoca **toda la `familyId`** y responde `401` → re-login.
+- `POST /auth/logout { refreshToken }` → `204` (revoca el presentado + su familia; idempotente). No
+  hay denylist de access: el access vale hasta su `exp`.
+- `Role` sigue siendo `user | admin` (sin cambio). El seed ya crea `admin@marketplace.dev`
+  (`SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`).
+- Desactivar un usuario (`PATCH /admin/users/:id/active`) revoca todas sus familias de refresh.
+- El **agente conversacional** verifica el access token y **no** recibe refresh token; su cuenta
+  efímera (opción B) se elimina en M1 (propagación de bearer real). La verificación puede ser por
+  firma (secreto compartido) o por introspección vía `GET /me` (200 = válido, 401 = expirado) —
+  esto último evita compartir el `JWT_SECRET`. Decisión de A4.
+
+### Carrito persistido — 🚧 borrador (M2, rama `feat/e2e-m2-cart`)
+
+Fuente de verdad única para app y agente. Modelos `Cart` (1:1 usuario) + `CartItem`
+(`@@unique([cartId, variantId])`). `GET /cart` sin ítems → `200 { items: [], itemCount: 0,
+subtotal: "0.00" }` (no `404`). `Idempotency-Key` se acepta pero todavía no deduplica (M5). El
+carrito **no** valida stock (eso es `POST /orders`). `GET /cart` omite las líneas cuya
+variante/producto quedó `visible:false` (soft-deleted); `POST /cart/items` y `/cart/merge` con una
+variante `visible:false` → `404`.
+
+| Método | Ruta | Notas |
+|---|---|---|
+| GET | `/cart` | Carrito del usuario. Vacío (no `404`) si no tiene. **Precio vivo**: `unitPrice`/`lineTotal`/`subtotal` se recalculan con el `price` actual en cada request. |
+| POST | `/cart/items` | Body `{ variantId \| sku, quantity }` — acepta cualquiera de los dos, se resuelve server-side. `quantity` se **suma** a la línea existente (nunca crea dos líneas). Acepta `Idempotency-Key` opcional. |
+| PATCH | `/cart/items/:variantId` | Body `{ quantity }` — cantidad **absoluta**; `0` borra la línea. |
+| DELETE | `/cart/items/:variantId` | Quita una línea. |
+| DELETE | `/cart` | Vacía el carrito. |
+| POST | `/cart/merge` | Body `{ items: [{ variantId\|sku, quantity }] }` — merge del carrito local al login. Unión de líneas, `quantity = max(local, server)` (idempotente). El cliente limpia su carrito local tras el `200`. |
+
+Respuesta de todos: `{ items: [{ variantId, sku, productId, name, color, image, quantity,
+unitPrice, lineTotal }], itemCount, subtotal }`.
+
+### Ciclo de vida del pedido (M4)
+
+- **Enum nuevo:** `pending_payment, paid, preparing, shipped, delivered, cancelled, refunded`.
+  Migración: `processing` → **`preparing`**; se agregan `paid`, `cancelled`, `refunded`.
+- **Matriz de transiciones** (fuera de esto → `409 { error, allowedTransitions: [...] }`):
+
+  | desde | hacia | quién |
+  |---|---|---|
+  | `pending_payment` | `paid` | **system** (webhook Stripe) / `POST /orders/:id/confirm` (demo) |
+  | `pending_payment` | `cancelled` | **buyer** (`POST /orders/:id/cancel`, sólo en este estado) o admin — restock |
+  | `paid` | `preparing` | admin |
+  | `paid` | `cancelled` | admin → dispara refund → `refunded` |
+  | `preparing` | `shipped` | admin (exige `trackingNumber` + `trackingCarrier`) |
+  | `shipped` | `delivered` | admin |
+  | `paid` / `preparing` / `shipped` / `delivered` | `refunded` | admin (con `reason`) |
+
+- Tabla `OrderStatusHistory { orderId, fromStatus, toStatus, actorType (system|admin|buyer),
+  actorUserId?, reason?, meta?, createdAt }` — una fila por transición.
+- `GET /orders/:id` → `timeline` deja de ser sintético, sale del historial real, pero **mantiene la
+  forma** `[{ status, at }]` (+ `actorType` opcional). Items con `variant.product` expandido.
+- Nuevo `POST /orders/:id/cancel` (buyer, sólo `pending_payment`, body `{ reason? }`).
+- `PATCH /admin/orders/:id/status` pasa de "sólo avanza en la cadena lineal" (`400`) a la matriz
+  (`409` con `allowedTransitions`).
+- **Stock:** se descuenta al crear el pedido (como hoy); restock en `cancelled`; barrido de
+  `pending_payment` vencidos (`ORDER_PAYMENT_TTL_MIN=30`, default 30 min) → `cancelled` + restock.
+- El `409` de `POST /orders` cubre dos casos, distinguibles por la presencia de
+  `insufficientStockSkus: string[]`: **presente** → stock insuficiente (reintentable ajustando
+  cantidades; antes era sólo el texto `Stock insuficiente para <sku>`); **ausente** → `Idempotency-Key`
+  reusada con body distinto (bug del cliente, no reintentable con otro body bajo la misma key).
+
+### Notificaciones = modelo propio (M4)
+
+Se separa **suscripción** de **entrega** (revierte "notifications = stock alerts" del `CLAUDE.md`):
+
+- `StockAlert` (creado por `POST /products/:id/alerts`) sigue siendo la **suscripción**.
+- Modelo nuevo `Notification { id, userId, type, title, body, readAt?, productId?, orderId?,
+  data Json?, createdAt }`, `NotificationType { order_status_changed, back_in_stock, price_drop }`
+  = los eventos **entregados**.
+- `GET /notifications` lee `Notification`. Wire:
+  ```
+  { id, type, title, body, read: <readAt != null>, createdAt,
+    deepLink: { type: "order" | "product", id: "<uuid>" },
+    data: { toStatus?, fromStatus?, trackingNumber?, carrier?, oldPrice?, newPrice?, sku? },
+    product: {…} | null,   // sólo en back_in_stock/price_drop (back-compat app v0)
+    notified: <bool> }      // espejo temporal de `read` (back-compat); se retira post-migración
+  ```
+- `PATCH /notifications/:id/read` (sin cambio) + nuevo `POST /notifications/read-all`.
+- **Triggers:** (1) toda transición de estado de pedido → `order_status_changed` al dueño;
+  (2) `stock` de variante `0 → >0` con `StockAlert back_in_stock` sin notificar → `back_in_stock`
+  por suscriptor; (3) baja de `price` con `StockAlert price_drop` sin notificar → `price_drop`.
+  **Por suscripción, no por favoritos.**
+
+### Pago con Stripe test (M5)
+
+- `POST /orders` (con `Idempotency-Key`) → pedido `pending_payment` + Stripe PaymentIntent
+  (`amount = total`, `metadata.orderId`). Respuesta: `{ order, payment: { provider: "stripe",
+  clientSecret, publishableKey } }`. La `publishableKey` en la respuesta evita un endpoint de config.
+- La app confirma con **Stripe Payment Sheet** (`stripe-android`) usando `clientSecret`. Sin WebView,
+  sin Checkout Session hosteada.
+- `POST /webhooks/stripe` (`payment_intent.succeeded`) — **sin `/v1`**, sin bearer; se verifica la
+  firma `Stripe-Signature` contra `STRIPE_WEBHOOK_SECRET` sobre el body crudo (`rawBody: true`, ruta
+  excluida del body-parser). → transición `pending_payment → paid` (`actorType: system`), vacía el
+  carrito, genera la `Notification`.
+- `POST /orders/:id/confirm` — fallback de demo, sólo con `STRIPE_DEMO_CONFIRM=true` (si no, `404`).
+  Hace `paymentIntents.retrieve`; si `succeeded` → `paid`. Cubre "el webhook no llega a localhost".
+- **Vaciado del carrito:** en la transición a `paid` (con `PAYMENTS_ENABLED=true`, M5+). En la
+  ventana M2→M4 (`PAYMENTS_ENABLED=false`) `POST /orders` vacía el carrito al **crear** el pedido.
+  App y agente hacen refetch de `GET /cart` post-checkout en ambos casos.
+- **`Idempotency-Key`** (header): tabla `IdempotencyKey { key, userId, endpoint, requestHash,
+  responseStatus, responseBody, createdAt }`, `@@unique([userId, key])`, TTL 24h. Misma key + mismo
+  body → replay de la respuesta guardada; misma key + body distinto → `409`. Key **client-origin**
+  (la genera el cliente Android, viaja `metadata.idempotencyKey` → agente → header). Obligatoria en
+  `POST /orders`: warn-only hasta M5, `400` si falta desde M5.
+
+### Admin (M3 + M7)
+
+Se **extiende la app Next.js `admin/`** existente y sus controllers REST `src/admin/*` — **no** hay
+SSR nuevo. Deltas de API: sólo `PATCH /admin/orders/:id/status` (matriz, ver arriba) y el filtro
+`status` de `GET /admin/orders` acepta el enum de 7 estados. El resto del CRUD admin no cambia.
+Tabla nueva `AuditLog` para acciones admin. Sesión propia del admin (cookie, no el bearer móvil) +
+CSRF.
+
+### i18n del seed (M6, acotado)
+
+Nombres de producto ya traducidos (migración `20260827130000`). Falta: nombres/subtítulos de
+categorías, `store`, descripciones, display-names de `Color` → es-419. `GET /products/search` pasa a
+matchear también `description`.
+
+---
+
 ## Base URL
 
 ```
@@ -23,6 +177,11 @@ Authorization: Bearer <accessToken>
 
 El token se obtiene de `POST /auth/register` o `POST /auth/login` y no tiene refresh — cuando
 vence (`JWT_EXPIRES_IN`, default `1d`), hay que volver a loguear.
+
+> **En `feat/e2e-m1-auth-refresh` (M1) esto cambió:** access token de 15m + refresh token,
+> `login`/`register` devuelven `{ accessToken, refreshToken, expiresIn }`, y hay `POST /auth/refresh`
+> + `POST /auth/logout`. Ver la sección "Próxima versión (v1) → Auth" arriba. Esta sección se
+> reescribe cuando la rama mergee a `master`.
 
 El payload del JWT incluye `sub` (userId), `email` y `role` (`user | admin`) — este último no
 necesita ser decodificado por clientes normales, pero los endpoints marcados 🔒🛡️ (admin) lo

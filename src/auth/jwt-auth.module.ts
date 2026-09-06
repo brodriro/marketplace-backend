@@ -22,7 +22,7 @@ import { RolesGuard } from './roles.guard';
       useFactory: (configService: ConfigService<AppConfig, true>) => ({
         secret: configService.get('jwt.secret', { infer: true }),
         signOptions: {
-          expiresIn: configService.get('jwt.expiresIn', { infer: true }),
+          expiresIn: configService.get('jwt.accessExpiresIn', { infer: true }),
         },
       }),
     }),

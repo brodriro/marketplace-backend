@@ -1,4 +1,9 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import {
+  INestApplication,
+  ValidationPipe,
+  VERSION_NEUTRAL,
+  VersioningType,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
@@ -9,6 +14,21 @@ import { AppModule } from './../src/app.module';
  * `npx prisma migrate dev`) — `PrismaService.onModuleInit` conecta al levantar el módulo, así
  * que este spec no puede correr contra una base mockeada como sí hace `agente-mobile`.
  */
+interface AuthTokensBody {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}
+
+const expectAuthTokens = (body: unknown): AuthTokensBody => {
+  expect(body).toEqual({
+    accessToken: expect.any(String) as string,
+    refreshToken: expect.any(String) as string,
+    expiresIn: expect.any(Number) as number,
+  });
+  return body as AuthTokensBody;
+};
+
 describe('AuthController (e2e)', () => {
   let app: INestApplication<App>;
   const email = `e2e-${Date.now()}@marketplace.dev`;
@@ -20,6 +40,10 @@ describe('AuthController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.enableVersioning({
+      type: VersioningType.URI,
+      defaultVersion: ['1', VERSION_NEUTRAL],
+    });
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -34,15 +58,13 @@ describe('AuthController (e2e)', () => {
     await app.close();
   });
 
-  it('registers a new account and returns an access token', async () => {
+  it('registers a new account and returns the token pair', async () => {
     const response = await request(app.getHttpServer())
       .post('/auth/register')
       .send({ email, password, name: 'E2E Tester' })
       .expect(201);
 
-    expect(response.body).toEqual({
-      accessToken: expect.any(String) as string,
-    });
+    expectAuthTokens(response.body);
   });
 
   it('rejects a duplicate registration with 409', async () => {
@@ -52,15 +74,22 @@ describe('AuthController (e2e)', () => {
       .expect(409);
   });
 
-  it('logs in with valid credentials', async () => {
+  it('logs in with valid credentials and returns the token pair', async () => {
     const response = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email, password })
       .expect(200);
 
-    expect(response.body).toEqual({
-      accessToken: expect.any(String) as string,
-    });
+    expectAuthTokens(response.body);
+  });
+
+  it('serves the same routes under the /v1 prefix', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/v1/auth/login')
+      .send({ email, password })
+      .expect(200);
+
+    expectAuthTokens(response.body);
   });
 
   it('rejects invalid credentials with 401', async () => {
@@ -82,10 +111,11 @@ describe('AuthController (e2e)', () => {
       .post('/auth/login')
       .send({ email, password })
       .expect(200);
+    const { accessToken } = expectAuthTokens(login.body);
 
     const response = await request(app.getHttpServer())
       .get('/me')
-      .set('Authorization', `Bearer ${login.body.accessToken as string}`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
 
     expect(response.body).toMatchObject({ email, name: 'E2E Tester' });
@@ -94,5 +124,76 @@ describe('AuthController (e2e)', () => {
 
   it('rejects /me without a token with 401', async () => {
     await request(app.getHttpServer()).get('/me').expect(401);
+  });
+
+  describe('refresh token rotation', () => {
+    let refreshToken: string;
+
+    beforeEach(async () => {
+      const login = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email, password })
+        .expect(200);
+      refreshToken = expectAuthTokens(login.body).refreshToken;
+    });
+
+    it('rotates the pair and invalidates the presented refresh token', async () => {
+      const rotated = await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({ refreshToken })
+        .expect(200);
+      const next = expectAuthTokens(rotated.body);
+      expect(next.refreshToken).not.toEqual(refreshToken);
+
+      // el refresh viejo ya no sirve
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({ refreshToken })
+        .expect(401);
+    });
+
+    it('revokes the whole family when a rotated token is reused', async () => {
+      const rotated = await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({ refreshToken })
+        .expect(200);
+      const next = expectAuthTokens(rotated.body);
+
+      // reusar el viejo (ya revocado) dispara la revocación de la familia
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({ refreshToken })
+        .expect(401);
+
+      // y por lo tanto el token nuevo, de la misma familia, también queda muerto
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({ refreshToken: next.refreshToken })
+        .expect(401);
+    });
+
+    it('logout revokes the refresh token (idempotent)', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/logout')
+        .send({ refreshToken })
+        .expect(204);
+
+      await request(app.getHttpServer())
+        .post('/auth/logout')
+        .send({ refreshToken })
+        .expect(204);
+
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({ refreshToken })
+        .expect(401);
+    });
+
+    it('rejects an unknown refresh token with 401', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({ refreshToken: 'not-a-real-token' })
+        .expect(401);
+    });
   });
 });

@@ -94,11 +94,19 @@ lacks sufficient stock, nothing is persisted (error message: `Stock insuficiente
 history table in the schema. Both "order doesn't exist" and "order exists but belongs to another
 user" return the same `404` (no ownership-vs-existence leak).
 
-### Notifications are stock alerts, not a separate table
+### Notifications are stock alerts, not a separate table (v0)
 
-There's no `Notification` model. `GET /notifications` / `PATCH /notifications/:id/read` read and
-update the `StockAlert` table (created via `POST /products/:id/alerts`); `StockAlert.notified`
-is the read/unread flag.
+In the current `master`, there's no `Notification` model. `GET /notifications` /
+`PATCH /notifications/:id/read` read and update the `StockAlert` table (created via
+`POST /products/:id/alerts`); `StockAlert.notified` is the read/unread flag.
+
+**Changing in the E2E plan (milestone M4 / task B5):** a dedicated `Notification` model is being
+added that separates *subscription* (`StockAlert` — still created via `POST /products/:id/alerts`)
+from *delivery* (`Notification` — rows written when a subscribed event fires, plus a new
+`order_status_changed` type for the order lifecycle). `GET /notifications` will read `Notification`
+and gain `read` / `deepLink` / `data`, keeping `product` + a `notified` mirror during the
+transition. Frozen contract: `documentacion/openapi.json` + `demoCompose/docs/plan-e2e.md` §6.4.
+Until that migration lands, the paragraph above describes the live behaviour.
 
 ### Color is a lookup table, not a FK
 

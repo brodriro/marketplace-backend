@@ -7,8 +7,16 @@
 
 El backend ya cubre el flujo completo que consume la app Android (catálogo, búsqueda, favoritos,
 reviews, pedidos, alertas de stock) y la integración con el agente conversacional A2A
-(`agente-mobile`). El foco ahora es **consolidar**: llevar a `master` + prod lo que se validó en
-la prueba conjunta del 2026-08-27 y cerrar los pendientes menores sin dueño.
+(`agente-mobile`).
+
+**Foco actual: plan E2E cross-repo** ("loop completo app + dashboard admin", coordinado con
+`demoCompose` y `agente-mobile`; canónico en `demoCompose/docs/plan-e2e.md`). `@backend` lleva el
+grueso: auth con roles + refresh, carrito persistido, ciclo de vida del pedido con historial y
+eventos, pago Stripe test, extender el admin, OpenAPI + `/v1`. Contrato congelado en M0
+(2026-09-06); la implementación arranca en M1. Lane detallada en [`tasks.md`](tasks.md).
+
+En paralelo sigue pendiente **consolidar**: redeploy de `api.brodriro.dev` desde `master` y el
+merge coordinado de `chore/docs-restructure`.
 
 ## Hitos
 
@@ -21,22 +29,29 @@ la prueba conjunta del 2026-08-27 y cerrar los pendientes menores sin dueño.
   de `api.brodriro.dev`** desde el `master` actual (el 2026-08-27 el deployado corría código previo).
 - ✅ Reestructura de docs (este layout de 4 archivos) — rama `chore/docs-restructure`, sin merge;
   el merge de los 3 repos se coordina junto.
+- ✅ Plan E2E · M0 (freeze de contrato) — `documentacion/openapi.json` + sección v1 de `API.md`
+  (2026-09-06). Contrato en `demoCompose/docs/plan-e2e.md` §6.
+- ⏳ Plan E2E · M1→M8 (auth+refresh → carrito → admin → ciclo de pedido+eventos → pago → i18n →
+  polish → deploy). Lane en `tasks.md`.
 - ⏳ Cerrar pendientes post-prueba (ver `tasks.md`).
 
 ## Decisiones de diseño abiertas
 
 - **`400` de stock insuficiente sin campo estructurado.** Hoy el mensaje es
-  `Stock insuficiente para <sku>` y el agente parsea el texto best-effort. Propuesta: agregar
-  `insufficientStockSkus: string[]` al body del error. Requiere coordinar el cambio con
-  `agente-mobile` (consume ambos lados). — sin dueño de fecha.
+  `Stock insuficiente para <sku>` y el agente parsea el texto best-effort. **Resuelto en el plan
+  E2E:** se agrega `insufficientStockSkus: string[]` al body del `409` como parte de M5/B4.
 - **Usuarios throwaway de la opción B se acumulan.** `POST /auth/register` de la auth del agente
-  crea `agent+<contextId>@agent.brodriro.dev` por sesión A2A y nada los limpia. Eventual job de
-  limpieza. — sin dueño.
+  crea `agent+<contextId>@agent.brodriro.dev` por sesión A2A y nada los limpia. **El plan E2E
+  (M1/A4) elimina la cuenta efímera**: el agente pasa a propagar el bearer real del usuario. Queda
+  pendiente sólo un cleanup one-shot de los `agent+*` ya creados.
 - **Prefijo de categoría en el SKU** — evaluado y **descartado** (reescribir 79 SKU existentes es
   breaking, sin ganancia funcional). Si se retoma, es una migración de datos deliberada y
   coordinada con `mobile` + `agente-mobile`.
-- **`/cart` server-side + usuario técnico / API key** — evaluado y **descartado**: el agente va
-  por carrito in-memory + auth opción B. No hay código muerto de esto.
+- **`/cart` server-side** — antes descartado (el agente iba por carrito in-memory + auth opción B).
+  **Revertido por el plan E2E** (decisión del usuario 2026-09-06): el carrito pasa a ser persistido
+  en el backend (`Cart`/`CartItem`), fuente de verdad única para app y agente; el agente lo consume
+  vía proxy con propagación del bearer real (se elimina la cuenta efímera de la opción B). Ver M2.
+  El "usuario técnico / API key" sigue descartado.
 
 ## Coordinación cross-repo
 

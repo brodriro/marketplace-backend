@@ -6,7 +6,8 @@ export interface AppConfig {
   };
   jwt: {
     secret: string;
-    expiresIn: string;
+    accessExpiresIn: string;
+    refreshExpiresIn: string;
   };
   cors: {
     origins: string[];
@@ -21,7 +22,8 @@ export const configuration = (): AppConfig => ({
   },
   jwt: {
     secret: process.env.JWT_SECRET ?? '',
-    expiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
+    accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
+    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '30d',
   },
   cors: {
     origins: (process.env.CORS_ORIGINS ?? 'http://localhost:5000')

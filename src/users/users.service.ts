@@ -108,9 +108,17 @@ export class UsersService {
     if (id === requesterId && !active) {
       throw new BadRequestException('No podés desactivar tu propia cuenta');
     }
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data: { active },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({ where: { id }, data: { active } });
+      if (!active) {
+        // Desactivar una cuenta corta sus sesiones: revoca todas las familias de refresh token
+        // activas (el access token sigue vivo hasta su `exp` corto, ~15m).
+        await tx.refreshToken.updateMany({
+          where: { userId: id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
+      return user;
     });
     return this.toSafeUser(updated);
   }

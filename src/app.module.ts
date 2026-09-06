@@ -7,6 +7,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { BannersModule } from './banners/banners.module';
+import { CartModule } from './cart/cart.module';
 import { CategoriesModule } from './categories/categories.module';
 import { configuration, validateEnv } from './config';
 import { FavoritesModule } from './favorites/favorites.module';
@@ -35,6 +36,7 @@ import { UsersModule } from './users/users.module';
     ProductsModule,
     PromoCodesModule,
     FavoritesModule,
+    CartModule,
     ReviewsModule,
     OrdersModule,
     NotificationsModule,
