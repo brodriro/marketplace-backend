@@ -7,6 +7,41 @@
 
 ---
 
+## 2026-09-07 · Plan E2E · M3 commiteado/pusheado + M4/B3+B5 código (rama `feat/e2e-m4-lifecycle`)
+
+- **M3 / B6:** el WIP que estaba sin commitear se cerró en `feat/e2e-m3-admin` (`c94c6cd`) y se
+  pusheó a `origin`. Sin merge — espera verificación app-side + el PATCH pre-prod de la prueba
+  coordinada §7.1 (lo dispara el usuario, ninguna sesión en background).
+- **Correlación E2E Capa 2** (`c056b8e`, plan-e2e.md §7.2): `AuditInterceptor` lee `X-E2E-Run`
+  (regex `^e2e-M\d+-\d{8}-\d{2}$`) → `AuditLog.meta.e2eRunId`; cliente admin `rawRequest()` manda
+  el header si `NEXT_PUBLIC_E2E_RUN`. Migración `20260907130000_add_audit_log_meta` (aditiva) **sin
+  aplicar**.
+- **M4 / B3 + B5** (rama `feat/e2e-m4-lifecycle`, código completo, sin aplicar migración, sin merge):
+  - **Schema:** enum `OrderStatus` 7 estados (`processing`→`preparing`, +`paid/cancelled/refunded`),
+    enum `OrderActorType`, `OrderStatusHistory`, enum `NotificationType`, `Notification`. Migración
+    `20260907140000_add_order_lifecycle_and_notifications` (hand-written: `ALTER TYPE` + 2 tablas +
+    FKs + backfill de fila génesis por pedido existente).
+  - **B3:** `src/orders/order-transitions.ts` (matriz §6.3) → `409 { error, allowedTransitions }`.
+    `POST /orders` escribe fila génesis. `updateStatus` (admin): valida matriz, exige tracking en
+    `→shipped` y `reason` en `→refunded`, restock solo en `cancelled` (§6.3), escribe historial
+    (`actorType: admin`, `actorId`), dispara notificación. `PATCH /admin/orders/:id/status` sin
+    `status` sigue siendo update de tracking solo. `POST /orders/:id/cancel` (buyer, solo
+    `pending_payment`, `{reason?}`). `timeline` de `GET /orders/:id` sale de `OrderStatusHistory`
+    (`+actorType`).
+  - **B5:** `NotificationsService` reescrito — `Notification` para entrega, `StockAlert` sigue
+    siendo la suscripción. `GET /notifications` serializa el wire §6.4 (`read`, `deepLink`, `data`,
+    `product` solo en back_in_stock/price_drop, `notified` espejo). `POST /notifications/read-all`
+    (`{count}`). Triggers: `emitOrderStatusChanged` (post-tx, best-effort), `emitBackInStock`
+    (`ProductsService.updateVariant`, stock 0→>0), `emitPriceDrop` (`ProductsService.update`, baja
+    de precio). Los `emit*` nunca lanzan.
+- **Verificación:** `tsc -p tsconfig.build.json` exit 0, `nest build` verde, eslint verde, unit 1/1.
+  **NO corrido:** e2e (sin Postgres en el entorno; además no hay specs backend de orders/notif — la
+  verificación es app-side por C4/C5). **NO aplicado:** ninguna de las 2 migraciones al RDS.
+- **Follow-ups:** aplicar migraciones `20260907130000` + `20260907140000` al RDS pre-prod (en
+  orden) cuando el usuario lo autorice; escribir specs e2e backend de orders/notif; regenerar
+  `openapi.json` (queda para M8, sin generador aún); B4/M5 (Stripe) sigue pendiente y toca
+  `pending_payment → paid`.
+
 ## 2026-09-07 · Plan E2E · M1+M2 mergeados a master + M3/B6 admin (rama)
 
 - **Merge:** `feat/e2e-m2-cart` (`9f75272` = M0+B1+B2) → `master`, fast-forward, pusheado a

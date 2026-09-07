@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { CreateVariantDto } from './dto/create-variant.dto';
@@ -21,7 +22,10 @@ const VISIBLE_VARIANTS = { where: { visible: true } };
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async findAll(query: PaginationQueryDto) {
     const { page, pageSize } = query;
@@ -204,11 +208,19 @@ export class ProductsService {
         throw new NotFoundException('Categoría no encontrada');
       }
     }
-    return this.prisma.product.update({
+    const updated = await this.prisma.product.update({
       where: { id },
       data: dto,
       include: { variants: VISIBLE_VARIANTS },
     });
+
+    // Trigger price_drop (§B5): sólo si el precio efectivamente bajó.
+    const oldPrice = product.price.toNumber();
+    if (dto.price !== undefined && dto.price < oldPrice) {
+      await this.notifications.emitPriceDrop(id, oldPrice, dto.price);
+    }
+
+    return updated;
   }
 
   /** Borrado lógico: nunca se hace DELETE físico, solo se apaga `visible` (así no se rompe el historial de pedidos). */
@@ -304,22 +316,29 @@ export class ProductsService {
       await this.assertColorsExist([dto.color]);
     }
 
-    try {
-      return await this.prisma.productVariant.update({
-        where: { id: variantId },
-        data: dto,
+    const updated = await this.prisma.productVariant
+      .update({ where: { id: variantId }, data: dto })
+      .catch((error: unknown) => {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002'
+        ) {
+          throw new ConflictException(
+            `Ya existe una variante con SKU ${dto.sku}`,
+          );
+        }
+        throw error;
       });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new ConflictException(
-          `Ya existe una variante con SKU ${dto.sku}`,
-        );
-      }
-      throw error;
+
+    // Trigger back_in_stock (§B5): stock que pasó de 0 a >0.
+    if (dto.stock !== undefined && variant.stock === 0 && dto.stock > 0) {
+      await this.notifications.emitBackInStock(
+        variant.productId,
+        dto.sku ?? variant.sku,
+      );
     }
+
+    return updated;
   }
 
   /** Borrado lógico, igual que `remove()` — el stock/SKU quedan en la DB para no romper pedidos ya hechos. */

@@ -8,7 +8,9 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { CurrentUser } from '../../auth/current-user.decorator';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import type { JwtPayload } from '../../auth/jwt-payload.type';
 import { Role } from '../../generated/prisma/client';
 import { Roles } from '../../auth/roles.decorator';
 import { RolesGuard } from '../../auth/roles.guard';
@@ -35,7 +37,11 @@ export class AdminOrdersController {
   }
 
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body() dto: UpdateOrderStatusDto) {
-    return this.ordersService.updateStatus(id, dto);
+  updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateOrderStatusDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.ordersService.updateStatus(id, dto, user.sub);
   }
 }

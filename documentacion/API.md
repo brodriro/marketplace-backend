@@ -463,7 +463,7 @@ no existe), `409` (el usuario ya dejó una reseña para este producto — 1 por 
 {
   "id": "uuid",
   "userId": "uuid",
-  "status": "pending_payment | processing | shipped | delivered",
+  "status": "pending_payment | paid | preparing | shipped | delivered | cancelled | refunded",
   "total": "349.00",
   "shippingCity": "string",
   "etaDays": 5,
@@ -487,8 +487,7 @@ no existe), `409` (el usuario ya dejó una reseña para este producto — 1 por 
 ### `GET /orders/:id`
 
 `200`: el `Order` de arriba, pero con `items[].variant` (incluyendo `variant.product`) expandido,
-más un `timeline` sintético derivado de `status`/`createdAt`/`updatedAt` (no hay tabla de
-historial de estados):
+más un `timeline` **derivado del historial real** (`OrderStatusHistory`), ordenado por `createdAt`:
 
 ```json
 {
@@ -504,16 +503,17 @@ historial de estados):
     }
   ],
   "timeline": [
-    { "status": "pending_payment", "at": "ISO-8601" },
-    { "status": "processing", "at": "ISO-8601" }
+    { "status": "pending_payment", "at": "ISO-8601", "actorType": "buyer" },
+    { "status": "paid", "at": "ISO-8601", "actorType": "system" },
+    { "status": "preparing", "at": "ISO-8601", "actorType": "admin" }
   ]
 }
 ```
 
-`timeline` incluye solo los estados desde `pending_payment` hasta el `status` actual de la orden
-(en el orden fijo `pending_payment → processing → shipped → delivered`). Errores: `404` (no
-existe o no pertenece al usuario autenticado — ambos casos devuelven el mismo 404, no se filtra
-por ownership vs. inexistencia).
+`timeline` es una fila por transición ocurrida (incluida la génesis `pending_payment` al crear el
+pedido); `actorType ∈ system | buyer | admin`. Errores: `404` (no existe o no pertenece al
+usuario autenticado — ambos casos devuelven el mismo 404, no se filtra por ownership vs.
+inexistencia).
 
 ### `POST /orders`
 
@@ -527,40 +527,68 @@ Body:
 ```
 
 `items` no puede ser vacío. Crea la orden en estado `pending_payment`, descuenta stock de cada
-variante y calcula `total` a partir del `price` del producto en el momento de la compra — todo
-en una única transacción de Prisma: si algún ítem no tiene stock suficiente, no se persiste nada.
+variante, calcula `total` a partir del `price` del producto en el momento de la compra y escribe
+la fila génesis de historial — todo en una única transacción de Prisma: si algún ítem no tiene
+stock suficiente, no se persiste nada.
 
 `201`: el `Order` creado, misma forma que `GET /orders` (cada `item` con `variant: { color, sku }`,
 sin el `product` completo). Errores: `400` (validación del body, o stock insuficiente — mensaje
 `Stock insuficiente para <sku>`), `404` (algún `variantId` no existe).
 
+### `POST /orders/:id/cancel`  — M4
+
+Cancelación por el comprador. Body opcional `{ "reason": "string" }` (se guarda como `note` en la
+fila de historial). Solo procede desde `pending_payment`; repone el stock de cada línea, pasa el
+pedido a `cancelled`, escribe la fila de historial (`actorType: buyer`) y dispara un
+`Notification` `order_status_changed`. `200`: el `Order` con `timeline`. Errores: `404` (no existe
+o no es del usuario), `409 { error, allowedTransitions: [...] }` (el pedido no está en
+`pending_payment`).
+
 ---
 
 ## Notifications 🔒 (todos los endpoints)
 
-Las "notificaciones" son las alertas de stock/precio creadas vía `POST /products/:id/alerts`
-(no hay una tabla `Notification` separada — `StockAlert.notified` hace de flag de leído).
+`Notification` es una tabla propia (entrega), separada de `StockAlert` (suscripción, vía
+`POST /products/:id/alerts`). Se escribe una fila por evento: `order_status_changed` (cada
+transición de un pedido del usuario), `back_in_stock` (stock de una variante `0 → >0`),
+`price_drop` (baja de precio de un producto). `back_in_stock` / `price_drop` solo llegan a
+usuarios con un `StockAlert` no disparado del tipo correspondiente.
 
 ### `GET /notifications`
 
-`200`: array de:
+`200`: array de (wire §6.4):
 
 ```json
 {
   "id": "uuid",
-  "userId": "uuid",
-  "productId": "uuid",
-  "type": "back_in_stock | price_drop",
+  "type": "order_status_changed | back_in_stock | price_drop",
+  "title": "string",
+  "body": "string",
+  "read": false,
   "notified": false,
   "createdAt": "ISO-8601",
-  "product": { /* Product SIN variants */ }
+  "deepLink": { "type": "order | product", "id": "uuid" },
+  "data": {
+    "fromStatus": "paid", "toStatus": "preparing",
+    "trackingNumber": "string", "carrier": "string",
+    "oldPrice": 120, "newPrice": 99, "sku": "string"
+  },
+  "product": { "...": "Product — solo en back_in_stock / price_drop, si no null" }
 }
 ```
 
+`data` trae solo las claves del evento (`fromStatus`/`toStatus`/`trackingNumber`/`carrier` para
+`order_status_changed`; `oldPrice`/`newPrice` para `price_drop`; `sku` para `back_in_stock`).
+`notified` es un espejo back-compat de `read`.
+
 ### `PATCH /notifications/:id/read`
 
-Marca `notified: true`. `200`: el `StockAlert` actualizado (sin `product` anidado). Errores:
-`404` (no existe o no pertenece al usuario).
+Marca la notificación como leída (`readAt`). `200`: la notificación con el wire de arriba.
+Errores: `404` (no existe o no pertenece al usuario).
+
+### `POST /notifications/read-all`  — M4
+
+Marca todas las no leídas del usuario. `200`: `{ "count": <n> }`.
 
 ---
 

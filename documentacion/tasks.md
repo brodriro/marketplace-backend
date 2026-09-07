@@ -18,7 +18,22 @@ desde `master` (ver blocked).
 
 ## doing
 
-- **M3 · B6 · Admin** — en `feat/e2e-m3-admin`, sin merge. Backend: `AuditLog` + migración
+- **M4 · B3 + B5 · Ciclo de vida + notificaciones** — en `feat/e2e-m4-lifecycle` (cortada de
+  `feat/e2e-m3-admin` `c94c6cd`), sin merge. Commits: `c056b8e` (Capa 2 correlación) + el de B3/B5.
+  **Código completo, build/lint/tsc/unit verdes.** Falta: aplicar las 2 migraciones al RDS
+  (`20260907130000_add_audit_log_meta`, `20260907140000_add_order_lifecycle_and_notifications`) —
+  no hay Postgres local en el entorno de trabajo, no se aplicó nada; y e2e (no hay specs backend de
+  orders/notifications, la verificación es app-side vía C4/C5). Detalle:
+  - Enum `OrderStatus` 7 estados (`processing`→`preparing` + `paid`/`cancelled`/`refunded`),
+    `OrderStatusHistory` + fila génesis en `POST /orders`, matriz `src/orders/order-transitions.ts`
+    → `409 { error, allowedTransitions }`, `preparing→shipped` exige tracking, `→refunded` exige
+    `reason`, restock en `cancelled`/`refunded`, `timeline` del historial real (`+actorType`).
+  - `POST /orders/:id/cancel` (buyer, solo `pending_payment`).
+  - `Notification` + `NotificationType`, `GET /notifications` wire §6.4, `PATCH /:id/read`,
+    `POST /notifications/read-all`, triggers `order_status_changed` / `back_in_stock` / `price_drop`
+    (los 2 últimos por suscripción `StockAlert`).
+
+- **M3 · B6 · Admin** — en `feat/e2e-m3-admin` `c94c6cd`, pusheado, sin merge. Backend: `AuditLog` + migración
   `20260907005057_add_audit_log` (RDS pre-prod), `AuditInterceptor` en los 5 `Admin*Controller`
   (registra POST/PATCH/DELETE exitosos), `GET /v1/admin/audit-logs` paginado. App Next.js `admin/`:
   cutover del base URL a `/v1`, `api.login` devuelve el par + `api.logout`, refresh-on-401 con
@@ -35,10 +50,8 @@ desde `master` (ver blocked).
 - **M3 · B6 · Admin (parte 1).** 🚧 en `feat/e2e-m3-admin` (ver "doing"). `AuditLog` + interceptor +
   `GET /admin/audit-logs`; app Next.js `admin/` cutover a `/v1` + refresh-on-401. Productos CRUD y
   lista de Pedidos ya existían. Sesión cookie+CSRF → M7 (opción B).
-- **M4 · B3 + B5 · Ciclo de vida + eventos.** Migración de enum (`processing→preparing` +
-  `paid/cancelled/refunded`), `OrderStatusHistory`, matriz de transiciones (`409 +
-  allowedTransitions`), `POST /orders/:id/cancel`, timeline real. Modelo `Notification` +
-  `NotificationType`, `POST /notifications/read-all`, 3 triggers. Depende de M3.
+- **M4 · B3 + B5 · Ciclo de vida + eventos.** 🚧 código completo en `feat/e2e-m4-lifecycle` (ver
+  "doing"). Falta aplicar migraciones al RDS + verificación e2e app-side.
 - **M5 · B4 · Pago Stripe test.** SDK `stripe`, PaymentIntent en `POST /orders`,
   `POST /webhooks/stripe` (raw body), `POST /orders/:id/confirm` (demo), tabla `IdempotencyKey`,
   barrido de `pending_payment` vencidos, `insufficientStockSkus` en el `409` de stock. Depende de
