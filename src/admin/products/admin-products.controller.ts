@@ -8,11 +8,13 @@ import {
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { Role } from '../../generated/prisma/client';
 import { Roles } from '../../auth/roles.decorator';
 import { RolesGuard } from '../../auth/roles.guard';
+import { AuditInterceptor } from '../audit/audit.interceptor';
 import { AdminProductsQueryDto } from '../../products/dto/admin-products-query.dto';
 import { CreateProductDto } from '../../products/dto/create-product.dto';
 import { CreateVariantDto } from '../../products/dto/create-variant.dto';
@@ -22,6 +24,7 @@ import { ProductsService } from '../../products/products.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.admin)
+@UseInterceptors(AuditInterceptor)
 @Controller('admin/products')
 export class AdminProductsController {
   constructor(private readonly productsService: ProductsService) {}

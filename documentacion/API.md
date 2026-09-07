@@ -145,10 +145,23 @@ Se separa **suscripción** de **entrega** (revierte "notifications = stock alert
 ### Admin (M3 + M7)
 
 Se **extiende la app Next.js `admin/`** existente y sus controllers REST `src/admin/*` — **no** hay
-SSR nuevo. Deltas de API: sólo `PATCH /admin/orders/:id/status` (matriz, ver arriba) y el filtro
-`status` de `GET /admin/orders` acepta el enum de 7 estados. El resto del CRUD admin no cambia.
-Tabla nueva `AuditLog` para acciones admin. Sesión propia del admin (cookie, no el bearer móvil) +
-CSRF.
+SSR nuevo.
+
+- **M3 (rama `feat/e2e-m3-admin`):** la app `admin/` pasa a `/v1` y adopta `/auth/refresh`
+  (refresh-on-401, JWT en `localStorage` — la sesión cookie+CSRF se difiere a M7). Tabla nueva
+  `AuditLog` + `AuditInterceptor` en los `Admin*Controller`: cada POST/PATCH/DELETE con 2xx deja
+  una fila (`actorId`, `actorEmail`, `method`, `path`, `resource`=clase controller, `action`=handler,
+  `entityId`, `statusCode`, `changes`=body con `password`/tokens redactados). Nuevo endpoint de
+  lectura:
+
+  | Método | Ruta | Notas |
+  |---|---|---|
+  | GET | `/admin/audit-logs?page=&pageSize=&resource=&actorId=` | Paginado `{ data, page, pageSize, total }`, más nuevas primero. `resource` filtra por clase (`AdminProductsController`). |
+
+- **M4:** `PATCH /admin/orders/:id/status` pasa a la matriz (ver arriba) y el filtro `status` de
+  `GET /admin/orders` acepta el enum de 7 estados.
+- **M7:** sesión propia del admin (cookie httpOnly, no el bearer móvil) + CSRF; página de auditoría;
+  analytics; config del agente.
 
 ### i18n del seed (M6, acotado)
 

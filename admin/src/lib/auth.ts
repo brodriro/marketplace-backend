@@ -1,6 +1,7 @@
 import type { Role } from "./types";
 
 const TOKEN_KEY = "admin_access_token";
+const REFRESH_KEY = "admin_refresh_token";
 
 export interface DecodedJwt {
   sub: string;
@@ -9,17 +10,33 @@ export interface DecodedJwt {
   exp: number;
 }
 
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}
+
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
   return window.localStorage.getItem(TOKEN_KEY);
 }
 
-export function setToken(token: string): void {
-  window.localStorage.setItem(TOKEN_KEY, token);
+export function getRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(REFRESH_KEY);
 }
 
-export function clearToken(): void {
+export function setTokens(tokens: {
+  accessToken: string;
+  refreshToken: string;
+}): void {
+  window.localStorage.setItem(TOKEN_KEY, tokens.accessToken);
+  window.localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
+}
+
+export function clearTokens(): void {
   window.localStorage.removeItem(TOKEN_KEY);
+  window.localStorage.removeItem(REFRESH_KEY);
 }
 
 /** Decodifica el payload del JWT sin validar la firma — solo para gating de UI, nunca para autorizar. */

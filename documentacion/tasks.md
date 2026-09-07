@@ -5,32 +5,36 @@
 
 ## Retomar acá
 
-**Plan E2E cross-repo activo.** M0 (freeze de contrato) cerrado el 2026-09-06:
-`documentacion/openapi.json` + sección "Próxima versión (v1)" en `API.md`. Contrato canónico en
-`demoCompose/docs/plan-e2e.md` §6. Lo próximo es **M1 · B1** (auth con refresh). Sin cambios de
-código todavía.
+**Plan E2E cross-repo activo.** M0+M1+M2 en `master` (`9f75272`), verificados e2e por la sesión app
+(checkpoint #1). **M3** (admin) en curso en `feat/e2e-m3-admin` — ver "doing". Orden acordado
+M3→M4→M5 en serie. Contrato canónico en `demoCompose/docs/plan-e2e.md` §6; `documentacion/openapi.json`
+lo refleja.
 
-Pendiente de antes: rama `chore/docs-restructure` sin merge (se coordina con los 3 repos) y el
-**redeploy de `api.brodriro.dev`** desde `master` (ver blocked).
+Servers de prueba levantados: backend `node dist/main.js` en `:3000` y admin `pnpm run dev` en
+`:3500` (PIDs en `%TEMP%\mb-m1.pid` / `%TEMP%\mb-admin.pid`), ambos contra el RDS pre-prod.
+
+Pendiente de antes: rama `chore/docs-restructure` sin merge y el **redeploy de `api.brodriro.dev`**
+desde `master` (ver blocked).
 
 ## doing
 
-- **M1 · B1 · Auth con refresh** — implementado en `feat/e2e-m1-auth-refresh`, sin merge.
-  `RefreshToken` + migración `20260906222633_add_refresh_token` (aplicada al RDS pre-prod),
-  `POST /auth/refresh` + `/auth/logout`, rotación + detección de reuso por familia, access→15m,
-  `login`/`register` devuelven `AuthTokens`, `/v1` vía `enableVersioning` (+ alias `VERSION_NEUTRAL`
-  hasta M8), desactivar usuario revoca sus familias. e2e 13/13 + smoke `:3000` OK. Falta: revisión
-  de la sesión app (C2) + decidir merge/flag-day del `/v1` + commit.
+- **M3 · B6 · Admin** — en `feat/e2e-m3-admin`, sin merge. Backend: `AuditLog` + migración
+  `20260907005057_add_audit_log` (RDS pre-prod), `AuditInterceptor` en los 5 `Admin*Controller`
+  (registra POST/PATCH/DELETE exitosos), `GET /v1/admin/audit-logs` paginado. App Next.js `admin/`:
+  cutover del base URL a `/v1`, `api.login` devuelve el par + `api.logout`, refresh-on-401 con
+  retry único (`api-client.ts`), `.env.local` → `192.168.31.63:3000/v1`, `CORS_ORIGINS` del backend
+  suma el origen LAN del admin. Build admin verde, e2e backend 13/13, smoke OK (login admin +
+  PATCH variante → fila de auditoría). Falta: verificación criterio #1/#2 del loop por la sesión
+  app + commit + merge. Sesión cookie+CSRF → diferida a M7 (decisión del usuario: opción B).
 
 ## E2E — lane de `@backend` (secuenciada; contrato congelado en `plan-e2e.md` §6)
 
-- **M1 · B1 · Auth con refresh.** ✅ hecho (rama `feat/e2e-m1-auth-refresh`, ver "doing").
-- **M2 · B2 · Dominio carrito.** 🚧 borrador en `feat/e2e-m2-cart` (stack sobre M1, sin merge):
-  modelos `Cart`/`CartItem` + migración `20260906225213_add_cart` (RDS pre-prod), `CartModule` con
-  los 6 endpoints, precio vivo, `variantId|sku` en escritura, merge `max(local,server)`. Smoke con
-  curl OK. Falta: dedupe real de `Idempotency-Key` (llega en M5), tests e2e, revisión C1, merge.
-- **M3 · B6 · Admin (parte 1).** Extender la app Next.js `admin/` + REST `src/admin/*`: Productos
-  CRUD + lista de Pedidos. Sesión propia + CSRF. Depende de M1.
+- **M1 · B1 · Auth con refresh.** ✅ en `master` (`9f75272`). Verificado e2e por la app (checkpoint #1).
+- **M2 · B2 · Dominio carrito.** ✅ en `master` (`9f75272`). Verificado e2e por la app (checkpoint #1:
+  carrito de la app = carrito del backend). Pendiente: dedupe real de `Idempotency-Key` (M5).
+- **M3 · B6 · Admin (parte 1).** 🚧 en `feat/e2e-m3-admin` (ver "doing"). `AuditLog` + interceptor +
+  `GET /admin/audit-logs`; app Next.js `admin/` cutover a `/v1` + refresh-on-401. Productos CRUD y
+  lista de Pedidos ya existían. Sesión cookie+CSRF → M7 (opción B).
 - **M4 · B3 + B5 · Ciclo de vida + eventos.** Migración de enum (`processing→preparing` +
   `paid/cancelled/refunded`), `OrderStatusHistory`, matriz de transiciones (`409 +
   allowedTransitions`), `POST /orders/:id/cancel`, timeline real. Modelo `Notification` +
@@ -41,8 +45,9 @@ Pendiente de antes: rama `chore/docs-restructure` sin merge (se coordina con los
   M1 + M4.
 - **M6 · B7 · i18n del seed (acotado).** Categorías/`store`/descripciones/colores → es-419; search
   matchea `description`. Paralelo desde M0.
-- **M7 · B6 · Admin polish.** Analytics, usuarios + rol, monitor de alertas, config del agente,
-  `AuditLog`. Depende de M3.
+- **M7 · B6 · Admin polish.** Analytics, monitor de alertas, config del agente, página de
+  `AuditLog` (la tabla + captura ya están en M3), **sesión admin cookie httpOnly + CSRF** (movida
+  desde M3 por decisión del usuario). Depende de M3.
 - **M8 · B8 + deploy.** `@nestjs/swagger` → `GET /docs` + `pnpm run openapi:dump`. Migraciones al
   RDS en orden + redeploy `api.brodriro.dev` + ensayo E2E del loop. Depende de M2..M7.
 

@@ -1,5 +1,7 @@
-import { clearToken, getToken } from "./auth";
+import { clearTokens, getRefreshToken, getToken, setTokens } from "./auth";
+import type { AuthTokens } from "./auth";
 import type {
+  AuditLogEntry,
   Banner,
   Category,
   Order,
@@ -11,7 +13,7 @@ import type {
   SafeUser,
 } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/v1";
 
 export class ApiError extends Error {
   constructor(
@@ -22,25 +24,65 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+function redirectToLogin(): void {
+  clearTokens();
+  if (typeof window !== "undefined") {
+    // Reset duro intencional (no useRouter): este módulo no es un componente/hook, y una
+    // sesión vencida debe limpiar todo el estado de la app, no solo navegar.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.href = "/login";
+  }
+}
+
+/** Un solo refresh en vuelo a la vez: varios 401 concurrentes comparten la misma promesa. */
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function tryRefresh(): Promise<boolean> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return false;
+
+  refreshInFlight ??= (async () => {
+    try {
+      const res = await fetch(`${API_URL}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+      });
+      if (!res.ok) return false;
+      const tokens = (await res.json()) as AuthTokens;
+      setTokens(tokens);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
+async function rawRequest(path: string, init: RequestInit): Promise<Response> {
   const token = getToken();
-  const res = await fetch(`${API_URL}${path}`, {
+  return fetch(`${API_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init?.headers,
+      ...init.headers,
     },
   });
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  let res = await rawRequest(path, init);
+
+  if (res.status === 401 && (await tryRefresh())) {
+    res = await rawRequest(path, init);
+  }
 
   if (res.status === 401) {
-    clearToken();
-    if (typeof window !== "undefined") {
-      // Reset duro intencional (no useRouter): este módulo no es un componente/hook, y una
-      // sesión vencida debe limpiar todo el estado de la app, no solo navegar.
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.href = "/login";
-    }
+    redirectToLogin();
     throw new ApiError(401, "No autenticado");
   }
 
@@ -62,10 +104,31 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   login: (email: string, password: string) =>
-    request<{ accessToken: string }>("/auth/login", {
+    request<AuthTokens>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
+
+  logout: async () => {
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      // best-effort: revoca la familia server-side; si falla igual limpiamos local
+      await request<void>("/auth/logout", {
+        method: "POST",
+        body: JSON.stringify({ refreshToken }),
+      }).catch(() => undefined);
+    }
+    clearTokens();
+  },
+
+  auditLogs: {
+    list: (page = 1, pageSize = 20, resource?: string) =>
+      request<Paginated<AuditLogEntry>>(
+        `/admin/audit-logs?page=${page}&pageSize=${pageSize}${
+          resource ? `&resource=${resource}` : ""
+        }`,
+      ),
+  },
 
   categories: {
     list: () => request<Category[]>("/categories"),

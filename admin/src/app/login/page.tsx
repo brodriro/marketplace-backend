@@ -14,7 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError, api } from "@/lib/api-client";
-import { decodeJwtPayload, setToken } from "@/lib/auth";
+import { decodeJwtPayload, setTokens } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,13 +26,13 @@ export default function LoginPage() {
     event.preventDefault();
     setLoading(true);
     try {
-      const { accessToken } = await api.login(email, password);
-      const decoded = decodeJwtPayload(accessToken);
+      const tokens = await api.login(email, password);
+      const decoded = decodeJwtPayload(tokens.accessToken);
       if (!decoded || decoded.role !== "admin") {
         toast.error("Esta cuenta no tiene permisos de administrador");
         return;
       }
-      setToken(accessToken);
+      setTokens(tokens);
       router.replace("/");
     } catch (error) {
       const message =

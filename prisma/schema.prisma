@@ -261,6 +261,31 @@ model StockAlert {
 }
 
 /**
+ * Registro de auditoría de acciones admin (plan E2E, hito M3). Una fila por mutación exitosa sobre
+ * `/v1/admin/*` (POST/PATCH/DELETE), escrita por `AuditInterceptor`. `resource`/`action` son el
+ * nombre de la clase controller y del handler (p. ej. `AdminProductsController` / `update`);
+ * `changes` guarda el body del request. Solo lectura desde `GET /v1/admin/audit-logs`.
+ */
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  actorEmail String?
+  method     String
+  path       String
+  resource   String
+  action     String
+  entityId   String?
+  statusCode Int
+  changes    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([resource, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+/**
  * Banners promocionales — sin unique key porque una imagen puede reusarse entre campañas (ver
  * prisma/seed.ts, que por eso usa find-before-create en vez de upsert).
  * `active` y `visible` son independientes: `active` lo controla el admin (pausar/reactivar sin

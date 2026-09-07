@@ -6,17 +6,20 @@ import {
   Patch,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { Role } from '../../generated/prisma/client';
 import { Roles } from '../../auth/roles.decorator';
 import { RolesGuard } from '../../auth/roles.guard';
+import { AuditInterceptor } from '../audit/audit.interceptor';
 import { AdminOrdersQueryDto } from '../../orders/dto/admin-orders-query.dto';
 import { UpdateOrderStatusDto } from '../../orders/dto/update-order-status.dto';
 import { OrdersService } from '../../orders/orders.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.admin)
+@UseInterceptors(AuditInterceptor)
 @Controller('admin/orders')
 export class AdminOrdersController {
   constructor(private readonly ordersService: OrdersService) {}

@@ -7,6 +7,30 @@
 
 ---
 
+## 2026-09-07 · Plan E2E · M1+M2 mergeados a master + M3/B6 admin (rama)
+
+- **Merge:** `feat/e2e-m2-cart` (`9f75272` = M0+B1+B2) → `master`, fast-forward, pusheado a
+  `origin/master`. La sesión app verificó el checkpoint #1 e2e en emulador (auth+refresh, `/v1`,
+  carrito de la app == carrito del backend) antes del merge. Ramas de feature borradas.
+- **M3 / B6 (en `feat/e2e-m3-admin`, sin merge):**
+  - Backend: modelo `AuditLog` + migración `20260907005057_add_audit_log` (RDS pre-prod).
+    `AuditInterceptor` (`src/admin/audit/`) en los 5 `Admin*Controller` — escribe una fila por
+    POST/PATCH/DELETE con 2xx (`actorId/email`, `resource`=clase, `action`=handler, `entityId`,
+    `changes`=body con password/tokens redactados). `GET /v1/admin/audit-logs` paginado
+    (`AdminAuditController`, `?page/pageSize/resource/actorId`). Nunca tumba la request si falla.
+  - App Next.js `admin/`: `api-client.ts` → base URL `/v1`, `api.login` devuelve `{accessToken,
+    refreshToken, expiresIn}`, `api.logout` (POST `/auth/logout`), **refresh-on-401 con retry único**
+    y guard de refresh en vuelo. `auth.ts` guarda el par (`setTokens`/`clearTokens`). `.env.local`
+    → `http://192.168.31.63:3000/v1`. Backend `CORS_ORIGINS` suma `http://192.168.31.63:3500`.
+  - Productos CRUD + lista/detalle de Pedidos **ya existían** en la app admin — M3 no los reescribe.
+  - **Sesión cookie httpOnly + CSRF: diferida a M7** (decisión del usuario, opción B: el admin
+    adopta `/auth/refresh` con el JWT en `localStorage`, mínimo cambio).
+- **Verificación:** admin build verde, backend e2e 13/13 + unit 1/1 + lint, smoke: login admin por
+  `/v1/auth/login` → PATCH stock de variante → fila en `audit_logs` con el actor y el body; los GET
+  no se auditan.
+- **Follow-ups:** verificación criterio #1/#2 del loop por la sesión app (edita stock/precio en el
+  admin → la app lo ve); commit + merge de `feat/e2e-m3-admin`; endurecer sesión admin en M7.
+
 ## 2026-09-06 · Plan E2E · M2 / B2 — carrito persistido (borrador, rama, sin merge)
 
 - **Qué:** rama `feat/e2e-m2-cart` (stack sobre `feat/e2e-m1-auth-refresh`). Modelos `Cart`
