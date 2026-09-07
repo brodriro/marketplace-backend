@@ -590,6 +590,37 @@
     "/admin/users/{id}/role": {
       "patch": { "tags": ["admin"], "operationId": "adminUpdateUserRole", "summary": "Cambiar el rol de un usuario", "description": "Body `{ role: \"user\" | \"admin\" }`. `400` si el admin autenticado intenta revocarse el propio rol.", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["role"], "properties": { "role": { "$ref": "#/components/schemas/Role" } } } } } }, "responses": { "200": { "description": "El usuario actualizado.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } }, "400": { "$ref": "#/components/responses/ValidationError" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } } }
     },
+    "/admin/audit-logs": {
+      "get": {
+        "tags": ["admin"],
+        "operationId": "adminListAuditLogs",
+        "summary": "Registro de auditoría de acciones admin",
+        "description": "Nuevo en M3. Una fila por mutación exitosa (POST/PATCH/DELETE) sobre `/v1/admin/*`, escrita por `AuditInterceptor`. Sólo lectura. Más nuevas primero.",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "default": 1 } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } },
+          { "name": "resource", "in": "query", "schema": { "type": "string" }, "description": "Filtra por controller, p. ej. `AdminProductsController`." },
+          { "name": "actorId", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de entradas de auditoría.",
+            "content": { "application/json": { "schema": {
+              "type": "object",
+              "required": ["data", "page", "pageSize", "total"],
+              "properties": {
+                "data": { "type": "array", "items": { "$ref": "#/components/schemas/AuditLogEntry" } },
+                "page": { "type": "integer" },
+                "pageSize": { "type": "integer" },
+                "total": { "type": "integer" }
+              }
+            } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
     "/admin/users/{id}/active": {
       "patch": { "tags": ["admin"], "operationId": "adminUpdateUserActive", "summary": "Activar/desactivar un usuario", "description": "Body `{ active: boolean }`. `400` si el admin intenta desactivarse a sí mismo. Un usuario `active:false` no puede loguearse. **Nota E2E**: desactivar un usuario revoca todas sus familias de refresh token (M1/B1).", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["active"], "properties": { "active": { "type": "boolean" } } } } } }, "responses": { "200": { "description": "El usuario actualizado.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } }, "400": { "$ref": "#/components/responses/ValidationError" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } } }
     }
@@ -1097,6 +1128,23 @@
           "sortOrder": { "type": "integer" },
           "createdAt": { "type": "string", "format": "date-time" },
           "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AuditLogEntry": {
+        "type": "object",
+        "description": "Una acción admin registrada (M3). `resource`/`action` son el nombre de la clase controller y del handler.",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "actorId": { "type": "string", "format": "uuid", "nullable": true },
+          "actorEmail": { "type": "string", "nullable": true },
+          "method": { "type": "string", "example": "PATCH" },
+          "path": { "type": "string", "example": "/v1/admin/products/<id>/variants/<id>" },
+          "resource": { "type": "string", "example": "AdminProductsController" },
+          "action": { "type": "string", "example": "updateVariant" },
+          "entityId": { "type": "string", "nullable": true },
+          "statusCode": { "type": "integer", "example": 200 },
+          "changes": { "type": "object", "nullable": true, "description": "Body del request (con `password`/tokens redactados)." },
+          "createdAt": { "type": "string", "format": "date-time" }
         }
       },
       "PromoCode": {

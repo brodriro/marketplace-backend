@@ -88,25 +88,43 @@ strings. This is the wire contract clients depend on (see `documentacion/API.md`
 `POST /orders` runs in a single Prisma transaction: validates stock per variant, decrements
 stock, and computes `total` from each variant's product `price` at purchase time — if any item
 lacks sufficient stock, nothing is persisted (error message: `Stock insuficiente para <sku>`).
+It also writes the genesis `OrderStatusHistory` row (`pending_payment`, `actorType: buyer`).
 
-`GET /orders/:id` returns a synthetic `timeline` derived from `status` + `createdAt`/`updatedAt`
-(fixed order `pending_payment → processing → shipped → delivered`) — there is no order-status-
-history table in the schema. Both "order doesn't exist" and "order exists but belongs to another
-user" return the same `404` (no ownership-vs-existence leak).
+**M4 (`feat/e2e-m4-lifecycle`, task B3):** the 7-state enum is
+`pending_payment · paid · preparing · shipped · delivered · cancelled · refunded` (`processing`
+was renamed to `preparing`). Transitions are validated against the matrix in
+`src/orders/order-transitions.ts` (frozen contract `demoCompose/docs/plan-e2e.md` §6.3) — an
+illegal transition returns `409 { error, allowedTransitions: [...] }`. `preparing → shipped`
+requires `trackingNumber` + `trackingCarrier`; any `→ refunded` requires `reason` (stored as the
+history row's `note`). `→ cancelled` restocks every line item (`refunded` does not — §6.3).
+`PATCH /admin/orders/:id/status`
+with no `status` (or the same status) is still a tracking-only update — no transition, no history.
+`POST /orders/:id/cancel` is the buyer's only transition: `pending_payment → cancelled` only,
+`{ reason? }` body, same `404` for "not found" and "not yours".
 
-### Notifications are stock alerts, not a separate table (v0)
+`GET /orders/:id.timeline` is now built from `OrderStatusHistory` rows ordered by `createdAt`
+(`[{ status, at, actorType }]`), not inferred from `status` + timestamps. Every transition (admin
+or buyer) also fires an `order_status_changed` `Notification` for the order's user (best-effort —
+a notification failure is logged, never rethrown).
 
-In the current `master`, there's no `Notification` model. `GET /notifications` /
-`PATCH /notifications/:id/read` read and update the `StockAlert` table (created via
-`POST /products/:id/alerts`); `StockAlert.notified` is the read/unread flag.
+### Notifications: `Notification` model (delivery) vs `StockAlert` (subscription)
 
-**Changing in the E2E plan (milestone M4 / task B5):** a dedicated `Notification` model is being
-added that separates *subscription* (`StockAlert` — still created via `POST /products/:id/alerts`)
-from *delivery* (`Notification` — rows written when a subscribed event fires, plus a new
-`order_status_changed` type for the order lifecycle). `GET /notifications` will read `Notification`
-and gain `read` / `deepLink` / `data`, keeping `product` + a `notified` mirror during the
-transition. Frozen contract: `documentacion/openapi.json` + `demoCompose/docs/plan-e2e.md` §6.4.
-Until that migration lands, the paragraph above describes the live behaviour.
+**M4 (`feat/e2e-m4-lifecycle`, task B5).** `StockAlert` is still the *subscription*, created via
+`POST /products/:id/alerts` unchanged. `Notification` is the *delivery*: one row per fired event.
+Three `NotificationType`s: `order_status_changed` (order transitions), `back_in_stock` (a
+variant's stock goes `0 → >0` in `ProductsService.updateVariant`), `price_drop` (a product's
+`price` decreases in `ProductsService.update`). `back_in_stock` / `price_drop` only notify users
+with a matching un-fired `StockAlert`, and flip that alert's `notified` flag.
+
+`GET /notifications` reads `Notification` and serializes the §6.4 wire:
+`{ id, type, title, body, read (=`readAt != null`), createdAt, deepLink: { type: "order"|"product", id },
+data: {...}, product }` — `product` is non-null only for `back_in_stock`/`price_drop`; `notified`
+is kept as a back-compat mirror of `read`. `PATCH /notifications/:id/read` +
+`POST /notifications/read-all` (`{ count }`). The `emit*` methods never throw.
+
+Pre-`master`/pre-M4 behaviour (still live on `master`): no `Notification` model —
+`GET /notifications` / `PATCH /notifications/:id/read` read and update `StockAlert` directly,
+`StockAlert.notified` being the read flag.
 
 ### Color is a lookup table, not a FK
 

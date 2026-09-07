@@ -6,6 +6,7 @@ import {
   Patch,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
@@ -13,6 +14,7 @@ import type { JwtPayload } from '../../auth/jwt-payload.type';
 import { Role } from '../../generated/prisma/client';
 import { Roles } from '../../auth/roles.decorator';
 import { RolesGuard } from '../../auth/roles.guard';
+import { AuditInterceptor } from '../audit/audit.interceptor';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { UpdateUserActiveDto } from '../../users/dto/update-user-active.dto';
 import { UpdateUserRoleDto } from '../../users/dto/update-user-role.dto';
@@ -21,6 +23,7 @@ import { UsersService } from '../../users/users.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.admin)
+@UseInterceptors(AuditInterceptor)
 @Controller('admin/users')
 export class AdminUsersController {
   constructor(private readonly usersService: UsersService) {}

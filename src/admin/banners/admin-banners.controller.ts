@@ -8,11 +8,13 @@ import {
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { Role } from '../../generated/prisma/client';
 import { Roles } from '../../auth/roles.decorator';
 import { RolesGuard } from '../../auth/roles.guard';
+import { AuditInterceptor } from '../audit/audit.interceptor';
 import { BannersService } from '../../banners/banners.service';
 import { CreateBannerDto } from '../../banners/dto/create-banner.dto';
 import { UpdateBannerDto } from '../../banners/dto/update-banner.dto';
@@ -20,6 +22,7 @@ import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.admin)
+@UseInterceptors(AuditInterceptor)
 @Controller('admin/banners')
 export class AdminBannersController {
   constructor(private readonly bannersService: BannersService) {}

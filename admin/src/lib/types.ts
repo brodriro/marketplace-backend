@@ -101,6 +101,20 @@ export interface Paginated<T> {
   total: number;
 }
 
+export interface AuditLogEntry {
+  id: string;
+  actorId: string | null;
+  actorEmail: string | null;
+  method: string;
+  path: string;
+  resource: string;
+  action: string;
+  entityId: string | null;
+  statusCode: number;
+  changes: unknown;
+  createdAt: string;
+}
+
 export interface Color {
   id: string;
   name: string;

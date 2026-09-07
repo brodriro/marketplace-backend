@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { clearToken, decodeJwtPayload, getToken, isTokenValid } from "@/lib/auth";
+import { clearTokens, decodeJwtPayload, getToken, isTokenValid } from "@/lib/auth";
 import type { DecodedJwt } from "@/lib/auth";
+import { api } from "@/lib/api-client";
 
 export function useAuth() {
   const router = useRouter();
@@ -13,7 +14,7 @@ export function useAuth() {
   useEffect(() => {
     const token = getToken();
     if (!isTokenValid(token)) {
-      clearToken();
+      clearTokens();
       // eslint-disable-next-line react-hooks/set-state-in-effect -- verificación de sesión al montar, no un loop de render
       setChecked(true);
       router.replace("/login");
@@ -21,7 +22,7 @@ export function useAuth() {
     }
     const decoded = decodeJwtPayload(token!);
     if (!decoded || decoded.role !== "admin") {
-      clearToken();
+      clearTokens();
       setChecked(true);
       router.replace("/login");
       return;
@@ -31,7 +32,7 @@ export function useAuth() {
   }, [router]);
 
   function logout() {
-    clearToken();
+    void api.logout();
     router.replace("/login");
   }
 

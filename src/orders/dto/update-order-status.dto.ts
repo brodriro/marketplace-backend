@@ -13,4 +13,9 @@ export class UpdateOrderStatusDto {
   @IsOptional()
   @IsString()
   trackingCarrier?: string;
+
+  /** Obligatorio para `-> refunded` (§6.3). Se guarda como `note` en la fila de historial. */
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }

@@ -20,12 +20,29 @@ enum ProductStatus {
 
 enum OrderStatus {
   pending_payment
-  processing
+  paid
+  preparing
   shipped
   delivered
+  cancelled
+  refunded
+}
+
+/** Quién disparó una transición de estado de pedido (plan E2E §6.3). */
+enum OrderActorType {
+  system
+  buyer
+  admin
 }
 
 enum StockAlertType {
+  back_in_stock
+  price_drop
+}
+
+/** Tipo de notificación entregada (plan E2E §6.4). La suscripción sigue siendo `StockAlert`. */
+enum NotificationType {
+  order_status_changed
   back_in_stock
   price_drop
 }
@@ -66,6 +83,7 @@ model User {
   orders        Order[]
   reviews       Review[]
   stockAlerts   StockAlert[]
+  notifications Notification[]
   refreshTokens RefreshToken[]
   cart          Cart?
 
@@ -121,11 +139,12 @@ model Product {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  category    Category         @relation(fields: [categoryId], references: [id])
-  variants    ProductVariant[]
-  reviews     Review[]
-  favorites   Favorite[]
-  stockAlerts StockAlert[]
+  category      Category         @relation(fields: [categoryId], references: [id])
+  variants      ProductVariant[]
+  reviews       Review[]
+  favorites     Favorite[]
+  stockAlerts   StockAlert[]
+  notifications Notification[]
 
   @@unique([categoryId, name])
   @@index([categoryId])
@@ -194,11 +213,33 @@ model Order {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
-  user  User        @relation(fields: [userId], references: [id])
-  items OrderItem[]
+  user          User                 @relation(fields: [userId], references: [id])
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
+  notifications Notification[]
 
   @@index([userId])
   @@map("orders")
+}
+
+/**
+ * Historial de transiciones de estado de un pedido (plan E2E, hito M4 / §6.3). Una fila por
+ * transición, incluida la génesis (`pending_payment` al crear). `GET /orders/:id.timeline` se
+ * arma leyendo esta tabla ordenada por `createdAt`, ya no se infiere de `status` + fechas.
+ */
+model OrderStatusHistory {
+  id        String         @id @default(uuid())
+  orderId   String
+  status    OrderStatus
+  actorType OrderActorType
+  actorId   String?
+  note      String?
+  createdAt DateTime       @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_status_history")
 }
 
 model OrderItem {
@@ -258,6 +299,66 @@ model StockAlert {
   @@index([userId])
   @@index([productId])
   @@map("stock_alerts")
+}
+
+/**
+ * Notificación entregada a un usuario (plan E2E, hito M4 / §6.4). Separa la *entrega* de la
+ * *suscripción* (`StockAlert`): se escribe una fila cuando un evento suscrito ocurre
+ * (`back_in_stock` / `price_drop`) o cuando cambia el estado de un pedido del usuario
+ * (`order_status_changed`). `readAt` es el flag de leído; el wire lo expone como `read` (bool).
+ * `data` lleva el payload tipado del evento (`toStatus`/`fromStatus`/`trackingNumber`/`carrier` o
+ * `oldPrice`/`newPrice`/`sku`). `deepLink` se deriva de `orderId`/`productId` en el serializer.
+ */
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  readAt    DateTime?
+  productId String?
+  orderId   String?
+  data      Json?
+  createdAt DateTime         @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  order   Order?   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+/**
+ * Registro de auditoría de acciones admin (plan E2E, hito M3). Una fila por mutación exitosa sobre
+ * `/v1/admin/*` (POST/PATCH/DELETE), escrita por `AuditInterceptor`. `resource`/`action` son el
+ * nombre de la clase controller y del handler (p. ej. `AdminProductsController` / `update`);
+ * `changes` guarda el body del request. Solo lectura desde `GET /v1/admin/audit-logs`.
+ *
+ * `meta` es metadata de transporte fuera del dominio (no del recurso editado). Hoy solo lleva
+ * `e2eRunId` — el identificador de una corrida de prueba coordinada (plan E2E §7.2, Capa 2), que el
+ * `AuditInterceptor` copia del header `X-E2E-Run` cuando matchea `^e2e-M\d+-\d{8}-\d{2}$`. Ausente
+ * el header => `meta` queda null y no hay efecto alguno.
+ */
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  actorEmail String?
+  method     String
+  path       String
+  resource   String
+  action     String
+  entityId   String?
+  statusCode Int
+  changes    Json?
+  meta       Json?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([resource, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
 }
 
 /**

@@ -7,17 +7,20 @@ import {
   Patch,
   Post,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { Role } from '../../generated/prisma/client';
 import { Roles } from '../../auth/roles.decorator';
 import { RolesGuard } from '../../auth/roles.guard';
+import { AuditInterceptor } from '../audit/audit.interceptor';
 import { CategoriesService } from '../../categories/categories.service';
 import { CreateCategoryDto } from '../../categories/dto/create-category.dto';
 import { UpdateCategoryDto } from '../../categories/dto/update-category.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.admin)
+@UseInterceptors(AuditInterceptor)
 @Controller('admin/categories')
 export class AdminCategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
