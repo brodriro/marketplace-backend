@@ -12,6 +12,20 @@ import { AuditLogService } from './audit-log.service';
 const MUTATING_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
 
 /**
+ * Formato del identificador de corrida de prueba coordinada (plan E2E §7.2). Un header `X-E2E-Run`
+ * que no matchee se ignora por completo — nunca se persiste texto arbitrario en `meta`.
+ */
+const E2E_RUN_ID_RE = /^e2e-M\d+-\d{8}-\d{2}$/;
+
+/** Devuelve el `X-E2E-Run` sólo si es un id válido; si no, `undefined`. */
+function extractE2eRunId(
+  header: string | string[] | undefined,
+): string | undefined {
+  const value = Array.isArray(header) ? header[0] : header;
+  return value && E2E_RUN_ID_RE.test(value) ? value : undefined;
+}
+
+/**
  * Escribe una fila en `audit_logs` por cada mutación exitosa sobre un controller admin. Se aplica
  * con `@UseInterceptors(AuditInterceptor)` en cada `Admin*Controller`. Las lecturas (GET) y las
  * requests que terminan en error no se registran.
@@ -33,6 +47,7 @@ export class AuditInterceptor implements NestInterceptor {
     const paramEntityId =
       (req.params?.variantId as string | undefined) ??
       (req.params?.id as string | undefined);
+    const e2eRunId = extractE2eRunId(req.headers['x-e2e-run']);
 
     return next.handle().pipe(
       tap((body) => {
@@ -46,6 +61,7 @@ export class AuditInterceptor implements NestInterceptor {
           entityId: paramEntityId ?? extractId(body),
           statusCode: res.statusCode,
           changes: req.body as unknown,
+          e2eRunId,
         });
       }),
     );

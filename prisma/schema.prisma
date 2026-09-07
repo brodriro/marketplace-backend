@@ -265,6 +265,11 @@ model StockAlert {
  * `/v1/admin/*` (POST/PATCH/DELETE), escrita por `AuditInterceptor`. `resource`/`action` son el
  * nombre de la clase controller y del handler (p. ej. `AdminProductsController` / `update`);
  * `changes` guarda el body del request. Solo lectura desde `GET /v1/admin/audit-logs`.
+ *
+ * `meta` es metadata de transporte fuera del dominio (no del recurso editado). Hoy solo lleva
+ * `e2eRunId` — el identificador de una corrida de prueba coordinada (plan E2E §7.2, Capa 2), que el
+ * `AuditInterceptor` copia del header `X-E2E-Run` cuando matchea `^e2e-M\d+-\d{8}-\d{2}$`. Ausente
+ * el header => `meta` queda null y no hay efecto alguno.
  */
 model AuditLog {
   id         String   @id @default(uuid())
@@ -277,6 +282,7 @@ model AuditLog {
   entityId   String?
   statusCode Int
   changes    Json?
+  meta       Json?
   createdAt  DateTime @default(now())
 
   @@index([actorId])

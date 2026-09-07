@@ -13,6 +13,8 @@ export interface AuditEntry {
   entityId?: string;
   statusCode: number;
   changes?: unknown;
+  /** Id de corrida de prueba coordinada (plan E2E §7.2). Se guarda en `meta.e2eRunId`. */
+  e2eRunId?: string;
 }
 
 /** Campos del body que nunca se guardan en el registro de auditoría. */
@@ -43,6 +45,7 @@ export class AuditLogService {
           entityId: entry.entityId ?? null,
           statusCode: entry.statusCode,
           changes: this.sanitize(entry.changes),
+          meta: entry.e2eRunId ? { e2eRunId: entry.e2eRunId } : undefined,
         },
       });
     } catch (err) {

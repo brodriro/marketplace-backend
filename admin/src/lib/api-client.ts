@@ -15,6 +15,10 @@ import type {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/v1";
 
+// Id de corrida de prueba coordinada (plan E2E §7.2, Capa 2). Sólo se setea en builds de QA
+// durante un test E2E; ausente => no se manda el header `X-E2E-Run` y el backend no hace nada.
+const E2E_RUN_ID = process.env.NEXT_PUBLIC_E2E_RUN?.trim() || undefined;
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -69,6 +73,7 @@ async function rawRequest(path: string, init: RequestInit): Promise<Response> {
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(E2E_RUN_ID ? { "X-E2E-Run": E2E_RUN_ID } : {}),
       ...init.headers,
     },
   });
