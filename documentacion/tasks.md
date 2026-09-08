@@ -52,8 +52,11 @@ desde `master` (ver blocked).
 - **M3 · B6 · Admin (parte 1).** 🚧 en `feat/e2e-m3-admin` (ver "doing"). `AuditLog` + interceptor +
   `GET /admin/audit-logs`; app Next.js `admin/` cutover a `/v1` + refresh-on-401. Productos CRUD y
   lista de Pedidos ya existían. Sesión cookie+CSRF → M7 (opción B).
-- **M4 · B3 + B5 · Ciclo de vida + eventos.** 🚧 código completo + migraciones aplicadas al RDS
-  (ver "doing"). Falta reinicio de `:3000` con código M4 + verificación e2e app-side.
+- **M4 · B3 + B5 · Ciclo de vida + eventos.** 🚧 código + migraciones + `:3000` sirviendo M4 +
+  interceptor `[e2e]` (`4371187`). E2E de correlación C10 pasó el tramo agente→backend
+  (`POST /v1/cart/items 201` con `X-E2E-Run` en `mb-3000.log`, runId `e2e-M4-20260908-01`); los 3
+  tramos de carrito verificados live. Falta: cierre formal de §7.1/§7.4 por demoCompose + PATCH
+  admin de M3 + merges.
 - **M5 · B4 · Pago Stripe test.** SDK `stripe`, PaymentIntent en `POST /orders`,
   `POST /webhooks/stripe` (raw body), `POST /orders/:id/confirm` (demo), tabla `IdempotencyKey`,
   barrido de `pending_payment` vencidos, `insufficientStockSkus` en el `409` de stock. Depende de

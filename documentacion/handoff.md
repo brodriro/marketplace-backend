@@ -41,10 +41,25 @@
   status` → "up to date" (11/11). Verificado por query directa: `audit_logs.meta`, tablas
   `order_status_history` / `notifications`, enums `OrderStatus` (7 valores, `processing` renombrado),
   `OrderActorType`, `NotificationType`; backfill de fila génesis corrió dentro del deploy.
-- **Follow-ups:** reiniciar `:3000` con el código de M4 (proceso del lado del usuario) para que
-  demoCompose/agente corran su e2e; escribir specs e2e backend de orders/notif; regenerar
-  `openapi.json` (queda para M8, sin generador aún); B4/M5 (Stripe) sigue pendiente y toca
-  `pending_payment → paid`.
+- **`:3000` sirviendo M4 (2026-09-08):** `node dist/main.js` desde el worktree, contra el RDS
+  pre-prod. Smoke autenticado OK: `GET /v1/orders/:id` → `timeline:[{status,at,actorType}]`,
+  `item.variant.product` anidado, rutas M4 mapeadas. Pedidos preexistentes: génesis backfilled
+  `actorType:"system"`.
+- **Capa 2 — interceptor global (`4371187`):** `E2eRunLoggerInterceptor` (`APP_INTERCEPTOR`) loguea
+  `[e2e] <runId> <method> <path> <status>` por request con header `X-E2E-Run` válido, en TODA ruta.
+  Cubre el tramo agente→backend en rutas no-admin (carrito/pedidos de usuario) que no pasan por
+  `AuditInterceptor`. No-op sin el header. `AuditLog.meta.e2eRunId` sigue siendo la evidencia del
+  tramo admin. §7.2/§7.3 actualizados por demoCompose para reflejar "log line, no fila DB" en
+  rutas no-admin.
+- **E2E de correlación M4 (C10, 2026-09-08):** demoCompose disparó el turno real
+  (`runId=e2e-M4-20260908-01`, "agrega 1 Auriculares Pro negro al carrito"). `mb-3000.log` capturó
+  `[e2e] e2e-M4-20260908-01 POST /v1/cart/items 201` + los `GET /v1/cart` alrededor. Tramo
+  agente→backend ✅. Falta el grep de `:2500` (agente) para que demoCompose flipee §7.1/§7.4 M4 a
+  `coord-test-ready=y`.
+- **Follow-ups:** el PATCH admin de M3 para el tramo admin de §7.1; merges de `feat/e2e-m3-admin` +
+  `feat/e2e-m4-lifecycle` a master tras el sign-off e2e; specs e2e backend de orders/notif;
+  regenerar `openapi.json` (M8); B4/M5 (Stripe, toca `pending_payment → paid`); B7 reseed es-419
+  (RC1 — "remera negra" no matchea `name` en inglés).
 
 ## 2026-09-07 · Plan E2E · M1+M2 mergeados a master + M3/B6 admin (rama)
 
