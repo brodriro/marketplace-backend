@@ -18,12 +18,14 @@ desde `master` (ver blocked).
 
 ## doing
 
-- **M4 · B3 + B5 · Ciclo de vida + notificaciones** — en `feat/e2e-m4-lifecycle` (cortada de
-  `feat/e2e-m3-admin` `c94c6cd`), sin merge. Commits: `c056b8e` (Capa 2 correlación) + el de B3/B5.
-  **Código completo, build/lint/tsc/unit verdes.** Falta: aplicar las 2 migraciones al RDS
-  (`20260907130000_add_audit_log_meta`, `20260907140000_add_order_lifecycle_and_notifications`) —
-  no hay Postgres local en el entorno de trabajo, no se aplicó nada; y e2e (no hay specs backend de
-  orders/notifications, la verificación es app-side vía C4/C5). Detalle:
+- **M4 · B3 + B5 · Ciclo de vida + notificaciones** — en `feat/e2e-m4-lifecycle @ 9dd1b23` (cortada
+  de `feat/e2e-m3-admin` `c94c6cd`), pusheada, sin merge. Commits: `c056b8e` (Capa 2 correlación) +
+  `9dd1b23` (B3/B5). **Código completo, build/lint/tsc/unit verdes.**
+  **Migraciones aplicadas al RDS pre-prod (2026-09-08)** (`20260907130000_add_audit_log_meta` +
+  `20260907140000_add_order_lifecycle_and_notifications`, `migrate deploy` OK, verificado por query).
+  Falta: **reiniciar `:3000` con el código de M4** (proceso del lado del usuario) → ahí demoCompose
+  corre C4/C5/C10 y agente corre A3. e2e backend de orders/notif: sin specs, verificación app-side.
+  Detalle:
   - Enum `OrderStatus` 7 estados (`processing`→`preparing` + `paid`/`cancelled`/`refunded`),
     `OrderStatusHistory` + fila génesis en `POST /orders`, matriz `src/orders/order-transitions.ts`
     → `409 { error, allowedTransitions }`, `preparing→shipped` exige tracking, `→refunded` exige
@@ -50,8 +52,11 @@ desde `master` (ver blocked).
 - **M3 · B6 · Admin (parte 1).** 🚧 en `feat/e2e-m3-admin` (ver "doing"). `AuditLog` + interceptor +
   `GET /admin/audit-logs`; app Next.js `admin/` cutover a `/v1` + refresh-on-401. Productos CRUD y
   lista de Pedidos ya existían. Sesión cookie+CSRF → M7 (opción B).
-- **M4 · B3 + B5 · Ciclo de vida + eventos.** 🚧 código completo en `feat/e2e-m4-lifecycle` (ver
-  "doing"). Falta aplicar migraciones al RDS + verificación e2e app-side.
+- **M4 · B3 + B5 · Ciclo de vida + eventos.** 🚧 código + migraciones + `:3000` sirviendo M4 +
+  interceptor `[e2e]` (`4371187`). E2E de correlación C10 pasó el tramo agente→backend
+  (`POST /v1/cart/items 201` con `X-E2E-Run` en `mb-3000.log`, runId `e2e-M4-20260908-01`); los 3
+  tramos de carrito verificados live. Falta: cierre formal de §7.1/§7.4 por demoCompose + PATCH
+  admin de M3 + merges.
 - **M5 · B4 · Pago Stripe test.** SDK `stripe`, PaymentIntent en `POST /orders`,
   `POST /webhooks/stripe` (raw body), `POST /orders/:id/confirm` (demo), tabla `IdempotencyKey`,
   barrido de `pending_payment` vencidos, `insufficientStockSkus` en el `409` de stock. Depende de
