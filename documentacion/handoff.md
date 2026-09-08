@@ -35,10 +35,14 @@
     (`ProductsService.updateVariant`, stock 0→>0), `emitPriceDrop` (`ProductsService.update`, baja
     de precio). Los `emit*` nunca lanzan.
 - **Verificación:** `tsc -p tsconfig.build.json` exit 0, `nest build` verde, eslint verde, unit 1/1.
-  **NO corrido:** e2e (sin Postgres en el entorno; además no hay specs backend de orders/notif — la
-  verificación es app-side por C4/C5). **NO aplicado:** ninguna de las 2 migraciones al RDS.
-- **Follow-ups:** aplicar migraciones `20260907130000` + `20260907140000` al RDS pre-prod (en
-  orden) cuando el usuario lo autorice; escribir specs e2e backend de orders/notif; regenerar
+  **NO corrido:** e2e (sin specs backend de orders/notif — la verificación es app-side por C4/C5).
+- **Migraciones aplicadas al RDS pre-prod (2026-09-08):** `20260907130000_add_audit_log_meta` +
+  `20260907140000_add_order_lifecycle_and_notifications` vía `prisma migrate deploy`. `migrate
+  status` → "up to date" (11/11). Verificado por query directa: `audit_logs.meta`, tablas
+  `order_status_history` / `notifications`, enums `OrderStatus` (7 valores, `processing` renombrado),
+  `OrderActorType`, `NotificationType`; backfill de fila génesis corrió dentro del deploy.
+- **Follow-ups:** reiniciar `:3000` con el código de M4 (proceso del lado del usuario) para que
+  demoCompose/agente corran su e2e; escribir specs e2e backend de orders/notif; regenerar
   `openapi.json` (queda para M8, sin generador aún); B4/M5 (Stripe) sigue pendiente y toca
   `pending_payment → paid`.
 
