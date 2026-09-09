@@ -68,9 +68,31 @@ export class ProductsService {
     const { q, category, minPrice, maxPrice, color, sortBy, cursor, pageSize } =
       query;
 
+    // Búsqueda por tokens: se parte `q` en palabras y cada una tiene que aparecer (insensible a
+    // mayúsculas/acentos según collation) en `name` **o** `description`. Antes solo matcheaba la
+    // frase completa contra `name` — "mochila viajera cuero" no encontraba nada aunque cada
+    // palabra estuviera en el nombre/descripción del producto (plan E2E M6 / RC1).
+    const tokens = q?.trim().split(/\s+/).filter(Boolean) ?? [];
+
     const where: Prisma.ProductWhereInput = {
       visible: true,
-      ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
+      ...(tokens.length > 0
+        ? {
+            AND: tokens.map((token) => ({
+              OR: [
+                {
+                  name: { contains: token, mode: Prisma.QueryMode.insensitive },
+                },
+                {
+                  description: {
+                    contains: token,
+                    mode: Prisma.QueryMode.insensitive,
+                  },
+                },
+              ],
+            })),
+          }
+        : {}),
       ...(category ? { categoryId: category } : {}),
       ...(minPrice !== undefined || maxPrice !== undefined
         ? { price: { gte: minPrice, lte: maxPrice } }
