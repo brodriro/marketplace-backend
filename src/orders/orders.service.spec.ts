@@ -5,7 +5,7 @@ import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CartService } from '../cart/cart.service';
-import { StripeService } from '../payments/stripe.service';
+import { PAYMENT_PROVIDER } from '../payments/payment-provider';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 
@@ -80,10 +80,21 @@ describe('OrdersService.create — idempotencia + stock (§6.5)', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsService, useValue: {} },
         { provide: CartService, useValue: { clear: cartClear } },
-        { provide: StripeService, useValue: { publishableKey: 'pk_test' } },
         {
+          provide: PAYMENT_PROVIDER,
+          useValue: {
+            name: 'bypass',
+            publishableKey: '',
+            allowsUnverifiedConfirm: true,
+            createIntent: jest
+              .fn()
+              .mockResolvedValue({ id: 'pi_1', clientSecret: 'sec_1' }),
+          },
+        },
+        {
+          // `payments.enabled` false → no se crea intento; el test cubre idempotencia/stock.
           provide: ConfigService,
-          useValue: { get: () => ({ enabled: false }) },
+          useValue: { get: () => false },
         },
       ],
     }).compile();

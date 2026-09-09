@@ -14,6 +14,7 @@ export interface AppConfig {
   };
   payments: {
     enabled: boolean;
+    provider: 'bypass' | 'stripe';
     stripeSecretKey: string;
     stripePublishableKey: string;
     stripeWebhookSecret: string;
@@ -41,7 +42,8 @@ export const configuration = (): AppConfig => ({
       .filter((origin) => origin.length > 0),
   },
   payments: {
-    enabled: process.env.PAYMENTS_ENABLED === 'true',
+    enabled: process.env.PAYMENTS_ENABLED !== 'false',
+    provider: process.env.PAYMENT_PROVIDER === 'stripe' ? 'stripe' : 'bypass',
     stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? '',
     stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY ?? '',
     stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '',

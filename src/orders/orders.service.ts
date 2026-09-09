@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -16,7 +17,10 @@ import type { AppConfig } from '../config/configuration';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CartService } from '../cart/cart.service';
-import { StripeService } from '../payments/stripe.service';
+import {
+  PAYMENT_PROVIDER,
+  type PaymentProvider,
+} from '../payments/payment-provider';
 import { AdminOrdersQueryDto } from './dto/admin-orders-query.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -58,7 +62,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly cart: CartService,
-    private readonly stripe: StripeService,
+    @Inject(PAYMENT_PROVIDER) private readonly payments: PaymentProvider,
     private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
@@ -214,13 +218,15 @@ export class OrdersService {
         });
       });
 
-      const payments = this.config.get('payments', { infer: true });
+      const paymentsEnabled = this.config.get('payments.enabled', {
+        infer: true,
+      });
       let payment:
-        | { provider: 'stripe'; clientSecret: string; publishableKey: string }
+        | { provider: string; clientSecret: string; publishableKey: string }
         | undefined;
 
-      if (payments.enabled) {
-        const intent = await this.stripe.createPaymentIntent({
+      if (paymentsEnabled) {
+        const intent = await this.payments.createIntent({
           amountDecimal: order.total.toNumber(),
           orderId: order.id,
           userId,
@@ -231,9 +237,9 @@ export class OrdersService {
           data: { paymentIntentId: intent.id },
         });
         payment = {
-          provider: 'stripe',
+          provider: this.payments.name,
           clientSecret: intent.clientSecret,
-          publishableKey: this.stripe.publishableKey,
+          publishableKey: this.payments.publishableKey,
         };
       } else {
         // Ventana M2→M4: sin pago real, el carrito se vacía al crear el pedido.
@@ -497,11 +503,12 @@ export class OrdersService {
   }
 
   /**
-   * `POST /orders/:id/confirm` — fallback de demo (`STRIPE_DEMO_CONFIRM=true`). Sin el flag → `404`.
-   * Valida ownership (mismo 404 que `findOne`) y delega en `markPaidBySystem`.
+   * `POST /orders/:id/confirm` — marca `paid` sin verificar el cobro contra el proveedor.
+   * Sólo disponible si el proveedor lo permite (`bypass` siempre; `stripe` con `STRIPE_DEMO_CONFIRM`);
+   * si no → `404`. Valida ownership (mismo 404 que `findOne`) y delega en `markPaidBySystem`.
    */
   async confirmDemo(userId: string, id: string, e2eRunId?: string) {
-    if (!this.config.get('payments.demoConfirm', { infer: true })) {
+    if (!this.payments.allowsUnverifiedConfirm) {
       throw new NotFoundException('Pedido no encontrado');
     }
     const order = await this.prisma.order.findUnique({ where: { id } });

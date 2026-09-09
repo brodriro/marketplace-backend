@@ -53,6 +53,23 @@ merge coordinado de `chore/docs-restructure`.
   vía proxy con propagación del bearer real (se elimina la cuenta efímera de la opción B). Ver M2.
   El "usuario técnico / API key" sigue descartado.
 
+## Pendiente para producción
+
+Cosas que están OK para dev / el e2e del loop pero **hay que resolver antes de friend & family
+(testeo con usuarios beta) y del despliegue a producción**.
+
+- **Proveedor de pago real.** M5/B4 dejó el pago detrás de una interfaz (`PaymentProvider`,
+  `src/payments/`) y el proveedor activo por defecto es **`bypass`**: no llama a ningún servicio
+  externo, entrega un `clientSecret` sintético y **`POST /orders/:id/confirm` marca el pedido
+  `paid` sin verificar ningún cobro**. Sirve para no atarse a un proveedor y para correr el e2e
+  completo sin cuenta de Stripe.
+  **Antes de F&F / prod:** setear `PAYMENT_PROVIDER=stripe` (o implementar otro proveedor: una
+  clase que cumpla `PaymentProvider` + su rama en `PaymentsModule`), cargar sus credenciales,
+  configurar el webhook (`POST /webhooks/stripe`, firma), y `STRIPE_DEMO_CONFIRM=false` para que
+  `POST /orders/:id/confirm` NO acepte confirmaciones sin verificar. El flujo F&F debe correr un
+  cobro real de sandbox de punta a punta (Payment Sheet → webhook → `paid`), no el bypass.
+- **Redeploy de `api.brodriro.dev`** — ver "Trenes de deploy" más abajo.
+
 ## Coordinación cross-repo
 
 Sistema de 3 repos: `agente-mobile` (agente conversacional A2A) · `marketplace-backend` (este) ·

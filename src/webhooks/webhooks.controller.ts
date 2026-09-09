@@ -2,28 +2,33 @@ import {
   BadRequestException,
   Controller,
   HttpCode,
+  Inject,
   Logger,
+  NotFoundException,
   Post,
   Req,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
-import type Stripe from 'stripe';
 import { OrdersService } from '../orders/orders.service';
-import { StripeService } from '../payments/stripe.service';
+import {
+  PAYMENT_PROVIDER,
+  type PaymentProvider,
+} from '../payments/payment-provider';
 
 /**
  * `POST /webhooks/stripe` (§6.5). Sin prefijo `/v1` (`VERSION_NEUTRAL`) para que la URL del
- * dashboard de Stripe sea estable. No hay guard de auth: la firma `Stripe-Signature` verificada
- * contra `STRIPE_WEBHOOK_SECRET` es la autenticación. Usa `req.rawBody` (bytes exactos).
+ * dashboard del proveedor sea estable. No hay guard de auth: la firma verificada por el proveedor
+ * (`PaymentProvider.verifyWebhook` sobre `req.rawBody`) es la autenticación. Si el proveedor activo
+ * no maneja webhooks (p. ej. `bypass`) → `404`.
  */
 @Controller({ path: 'webhooks/stripe', version: VERSION_NEUTRAL })
 export class WebhooksController {
   private readonly logger = new Logger(WebhooksController.name);
 
   constructor(
-    private readonly stripe: StripeService,
+    @Inject(PAYMENT_PROVIDER) private readonly payments: PaymentProvider,
     private readonly orders: OrdersService,
   ) {}
 
@@ -32,14 +37,20 @@ export class WebhooksController {
   async handleStripe(
     @Req() req: RawBodyRequest<Request>,
   ): Promise<{ received: boolean }> {
+    if (!this.payments.supportsWebhook) {
+      throw new NotFoundException(
+        `El proveedor de pago "${this.payments.name}" no expone webhooks`,
+      );
+    }
+
     const signature = req.headers['stripe-signature'];
     if (!req.rawBody || typeof signature !== 'string') {
       throw new BadRequestException('Falta cuerpo o firma del webhook');
     }
 
-    let event: Stripe.Event;
+    let result: ReturnType<PaymentProvider['verifyWebhook']>;
     try {
-      event = this.stripe.constructEvent(req.rawBody, signature);
+      result = this.payments.verifyWebhook(req.rawBody, signature);
     } catch (err) {
       this.logger.warn(
         `Firma de webhook inválida: ${
@@ -49,21 +60,13 @@ export class WebhooksController {
       throw new BadRequestException('Firma de webhook inválida');
     }
 
-    if (event.type === 'payment_intent.succeeded') {
-      const intent = event.data.object;
-      const orderId = intent.metadata?.orderId;
-      if (orderId) {
-        const { changed } = await this.orders.markPaidBySystem(orderId);
-        this.logger.log(
-          `payment_intent.succeeded ${intent.id} → pedido ${orderId} ${
-            changed ? 'marcado paid' : '(ya no estaba pending_payment)'
-          }`,
-        );
-      } else {
-        this.logger.warn(
-          `payment_intent.succeeded ${intent.id} sin metadata.orderId`,
-        );
-      }
+    if (result.type === 'payment_succeeded' && result.orderId) {
+      const { changed } = await this.orders.markPaidBySystem(result.orderId);
+      this.logger.log(
+        `payment_succeeded → pedido ${result.orderId} ${
+          changed ? 'marcado paid' : '(ya no estaba pending_payment)'
+        }`,
+      );
     }
 
     return { received: true };
