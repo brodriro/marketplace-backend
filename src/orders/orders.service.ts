@@ -236,6 +236,9 @@ export class OrdersService {
           where: { id: order.id },
           data: { paymentIntentId: intent.id },
         });
+        // El `order` es el snapshot de dentro de la tx (antes del update) — reflejar el id acá
+        // para que la respuesta de `POST /orders` no traiga `paymentIntentId: null`.
+        order.paymentIntentId = intent.id;
         payment = {
           provider: this.payments.name,
           clientSecret: intent.clientSecret,
