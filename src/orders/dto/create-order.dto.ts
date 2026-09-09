@@ -3,6 +3,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsInt,
+  IsOptional,
   IsString,
   Min,
   ValidateNested,
@@ -26,4 +27,12 @@ export class CreateOrderDto {
   @ValidateNested({ each: true })
   @Type(() => CreateOrderItemDto)
   items: CreateOrderItemDto[];
+
+  /**
+   * Código de descuento (plan E2E §A2). Se acepta y entra en el hash de idempotencia; la
+   * aplicación al `total` es follow-up de la integración con `promo-codes` (fuera de B4).
+   */
+  @IsOptional()
+  @IsString()
+  discountCode?: string;
 }

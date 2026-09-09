@@ -79,13 +79,14 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  favorites     Favorite[]
-  orders        Order[]
-  reviews       Review[]
-  stockAlerts   StockAlert[]
-  notifications Notification[]
-  refreshTokens RefreshToken[]
-  cart          Cart?
+  favorites       Favorite[]
+  orders          Order[]
+  reviews         Review[]
+  stockAlerts     StockAlert[]
+  notifications   Notification[]
+  refreshTokens   RefreshToken[]
+  idempotencyKeys IdempotencyKey[]
+  cart            Cart?
 
   @@map("users")
 }
@@ -210,6 +211,10 @@ model Order {
   etaDays         Int
   trackingNumber  String?
   trackingCarrier String?
+  // PaymentIntent de Stripe asociado (plan E2E §6.5 / hito M5). Null si `PAYMENTS_ENABLED=false`
+  // (el pedido se da por pagado al crearse). El `clientSecret` no se persiste: se devuelve sólo
+  // en la respuesta de `POST /orders` y en el replay de idempotencia.
+  paymentIntentId String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -234,12 +239,36 @@ model OrderStatusHistory {
   actorType OrderActorType
   actorId   String?
   note      String?
+  // Metadata de transporte fuera del dominio, igual que `AuditLog.meta` (plan E2E §7.2). Hoy sólo
+  // `e2eRunId` cuando la transición llega con un header `X-E2E-Run` válido. Null si no vino.
+  meta      Json?
   createdAt DateTime       @default(now())
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@map("order_status_history")
+}
+
+/**
+ * Deduplicación de `POST /orders` por clave client-origin (plan E2E §6.5 / hito M5). La genera el
+ * cliente Android, viaja `metadata.idempotencyKey` → agente → header `Idempotency-Key`.
+ * `@@unique([userId, key])`: reintento con la misma key + mismo `requestHash` → se re-devuelve
+ * `response` (replay); misma key + body distinto → `409`. TTL 24h, un barrido limpia las viejas.
+ */
+model IdempotencyKey {
+  id          String   @id @default(uuid())
+  userId      String
+  key         String
+  requestHash String
+  response    Json
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, key])
+  @@index([createdAt])
+  @@map("idempotency_keys")
 }
 
 model OrderItem {
