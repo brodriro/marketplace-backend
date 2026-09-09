@@ -63,6 +63,12 @@ Cosas que están OK para dev / el e2e del loop pero **hay que resolver antes de 
   externo, entrega un `clientSecret` sintético y **`POST /orders/:id/confirm` marca el pedido
   `paid` sin verificar ningún cobro**. Sirve para no atarse a un proveedor y para correr el e2e
   completo sin cuenta de Stripe.
+  Contrato de respuesta de `POST /orders` (igual para cualquier proveedor):
+  `{ order, payment: { provider, clientSecret, publishableKey } }`. El cliente **branchea por
+  `payment.provider`**: `"bypass"` → saltear la pantalla de pago y llamar directo a
+  `POST /orders/:id/confirm`; `"stripe"` → Payment Sheet real. Estado en
+  `feat/e2e-m5-payments @ cab232e` (pusheada, `:3000` verificado end-to-end contra el RDS pre-prod
+  con `bypass`).
   **Antes de F&F / prod:** setear `PAYMENT_PROVIDER=stripe` (o implementar otro proveedor: una
   clase que cumpla `PaymentProvider` + su rama en `PaymentsModule`), cargar sus credenciales,
   configurar el webhook (`POST /webhooks/stripe`, firma), y `STRIPE_DEMO_CONFIRM=false` para que
