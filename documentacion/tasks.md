@@ -5,72 +5,56 @@
 
 ## Retomar acá
 
-**Plan E2E cross-repo activo.** M0+M1+M2 en `master` (`9f75272`), verificados e2e por la sesión app
-(checkpoint #1). **M3** (admin) en curso en `feat/e2e-m3-admin` — ver "doing". Orden acordado
-M3→M4→M5 en serie. Contrato canónico en `demoCompose/docs/plan-e2e.md` §6; `documentacion/openapi.json`
+**Plan E2E cross-repo activo.** **M0→M4 en `master` (`59707b4`)** (PRs #2, #3, #4 — este último
+también trajo B7 search por tokens). El loop E2E de M4 (demoCompose C4/C5/**C10** + agente A3)
+cerró el 2026-09-08: `plan-e2e.md §7.1/§7.4` fila M4 → `coord-test-ready = y`. **Próximo backend:
+M5 · B4 (Stripe).** Contrato canónico en `demoCompose/docs/plan-e2e.md` §6; `documentacion/openapi.json`
 lo refleja.
 
-Servers de prueba levantados: backend `node dist/main.js` en `:3000` y admin `pnpm run dev` en
-`:3500` (PIDs en `%TEMP%\mb-m1.pid` / `%TEMP%\mb-admin.pid`), ambos contra el RDS pre-prod.
+Migraciones del RDS pre-prod al día: `…_add_audit_log`, `…_add_audit_log_meta`,
+`…_add_order_lifecycle_and_notifications` aplicadas y verificadas (2026-09-08).
 
 Pendiente de antes: rama `chore/docs-restructure` sin merge y el **redeploy de `api.brodriro.dev`**
 desde `master` (ver blocked).
 
 ## doing
 
-- **M4 · B3 + B5 · Ciclo de vida + notificaciones** — en `feat/e2e-m4-lifecycle @ 9dd1b23` (cortada
-  de `feat/e2e-m3-admin` `c94c6cd`), pusheada, sin merge. Commits: `c056b8e` (Capa 2 correlación) +
-  `9dd1b23` (B3/B5). **Código completo, build/lint/tsc/unit verdes.**
-  **Migraciones aplicadas al RDS pre-prod (2026-09-08)** (`20260907130000_add_audit_log_meta` +
-  `20260907140000_add_order_lifecycle_and_notifications`, `migrate deploy` OK, verificado por query).
-  Falta: **reiniciar `:3000` con el código de M4** (proceso del lado del usuario) → ahí demoCompose
-  corre C4/C5/C10 y agente corre A3. e2e backend de orders/notif: sin specs, verificación app-side.
-  Detalle:
-  - Enum `OrderStatus` 7 estados (`processing`→`preparing` + `paid`/`cancelled`/`refunded`),
-    `OrderStatusHistory` + fila génesis en `POST /orders`, matriz `src/orders/order-transitions.ts`
-    → `409 { error, allowedTransitions }`, `preparing→shipped` exige tracking, `→refunded` exige
-    `reason`, restock en `cancelled`/`refunded`, `timeline` del historial real (`+actorType`).
-  - `POST /orders/:id/cancel` (buyer, solo `pending_payment`).
-  - `Notification` + `NotificationType`, `GET /notifications` wire §6.4, `PATCH /:id/read`,
-    `POST /notifications/read-all`, triggers `order_status_changed` / `back_in_stock` / `price_drop`
-    (los 2 últimos por suscripción `StockAlert`).
+- **M6 · B7 · parte de datos (i18n es-419).** El search por tokens ya está en `master` (PR #4).
+  Falta traducir `categories.name` / `store` / `products.description` / display-names de `Color` a
+  es-419: migración de datos (como `20260827130000` hizo con `products.name`) + actualizar
+  `seed-data/feed.json`. Sin esto "remera negra" aún no matchea (color en variantes/desc en inglés).
+  Toca datos del RDS pre-prod → decisión del usuario.
 
-- **M3 · B6 · Admin** — en `feat/e2e-m3-admin` `c94c6cd`, pusheado, sin merge. Backend: `AuditLog` + migración
-  `20260907005057_add_audit_log` (RDS pre-prod), `AuditInterceptor` en los 5 `Admin*Controller`
-  (registra POST/PATCH/DELETE exitosos), `GET /v1/admin/audit-logs` paginado. App Next.js `admin/`:
-  cutover del base URL a `/v1`, `api.login` devuelve el par + `api.logout`, refresh-on-401 con
-  retry único (`api-client.ts`), `.env.local` → `192.168.31.63:3000/v1`, `CORS_ORIGINS` del backend
-  suma el origen LAN del admin. Build admin verde, e2e backend 13/13, smoke OK (login admin +
-  PATCH variante → fila de auditoría). Falta: verificación criterio #1/#2 del loop por la sesión
-  app + commit + merge. Sesión cookie+CSRF → diferida a M7 (decisión del usuario: opción B).
+- **M3 §7.1 — tramo admin de la prueba coordinada.** Falta el PATCH admin real (price + stock de
+  una variante de un producto de Home) para que demoCompose confirme el data-plane read-only y
+  `AuditLog.meta.e2eRunId` capture el `runId` del tramo admin. Lo dispara el usuario / sesión con
+  el admin a mano.
 
 ## E2E — lane de `@backend` (secuenciada; contrato congelado en `plan-e2e.md` §6)
 
 - **M1 · B1 · Auth con refresh.** ✅ en `master` (`9f75272`). Verificado e2e por la app (checkpoint #1).
 - **M2 · B2 · Dominio carrito.** ✅ en `master` (`9f75272`). Verificado e2e por la app (checkpoint #1:
   carrito de la app = carrito del backend). Pendiente: dedupe real de `Idempotency-Key` (M5).
-- **M3 · B6 · Admin (parte 1).** 🚧 en `feat/e2e-m3-admin` (ver "doing"). `AuditLog` + interceptor +
-  `GET /admin/audit-logs`; app Next.js `admin/` cutover a `/v1` + refresh-on-401. Productos CRUD y
-  lista de Pedidos ya existían. Sesión cookie+CSRF → M7 (opción B).
-- **M4 · B3 + B5 · Ciclo de vida + eventos.** 🚧 código + migraciones + `:3000` sirviendo M4 +
-  interceptor `[e2e]` (`4371187`). E2E de correlación C10 pasó el tramo agente→backend
-  (`POST /v1/cart/items 201` con `X-E2E-Run` en `mb-3000.log`, runId `e2e-M4-20260908-01`); los 3
-  tramos de carrito verificados live. Falta: cierre formal de §7.1/§7.4 por demoCompose + PATCH
-  admin de M3 + merges.
+- **M3 · B6 · Admin (parte 1).** ✅ en `master` (`c94c6cd` vía PR #2). `AuditLog` + `AuditInterceptor`
+  en los 5 `Admin*Controller` + `GET /admin/audit-logs`; app Next.js `admin/` cutover a `/v1` +
+  refresh-on-401. Sesión cookie+CSRF → M7 (opción B). Falta solo el tramo admin de §7.1 (ver "doing").
+- **M4 · B3 + B5 · Ciclo de vida + eventos.** ✅ en `master` (`9dd1b23`/`c056b8e` vía PR #2;
+  `4371187` interceptor `[e2e]` global vía PR #3). Migraciones aplicadas al RDS pre-prod. Loop E2E
+  C10 verde 2026-09-08 (`runId e2e-M4-20260908-01`: 3 tramos de carrito app↔agente↔backend
+  verificados live; `POST /v1/cart/items 201` con `X-E2E-Run` en `mb-3000.log`). `§7.1/§7.4` M4 → `y`.
+  Pendiente menor: specs e2e backend de orders/notif (no bloqueante); slots `e2eRunId` en
+  `OrderStatusHistory.meta` / `Notification.data` no se hicieron — se agregan con la migración de M5
+  si demoCompose los quiere para el lifecycle de pedido.
 - **M5 · B4 · Pago Stripe test.** SDK `stripe`, PaymentIntent en `POST /orders`,
   `POST /webhooks/stripe` (raw body), `POST /orders/:id/confirm` (demo), tabla `IdempotencyKey`,
-  barrido de `pending_payment` vencidos, `insufficientStockSkus` en el `409` de stock. Depende de
-  M1 + M4.
+  barrido de `pending_payment` vencidos, `insufficientStockSkus` en el `409` de stock,
+  `pending_payment → paid` (actor `system`). **Fold-in acordado con demoCompose:**
+  `OrderStatusHistory.meta.e2eRunId` en la migración de M5. Depende de M1 + M4 (ambas en master).
 - **M6 · B7 · i18n del seed (acotado).** Paralelo desde M0.
-  - 🚧 **Search por tokens sobre `name` + `description`** — `feat/e2e-m6-i18n-seed @ aa877cc`,
-    pusheado, sin merge. `q` se tokeniza; cada palabra tiene que estar en `name` OR `description`.
-    Antes: frase completa contra `name` solo. Unit 4/4 + smoke RDS. Cierra el "search matchea
-    `description`" del spec y parte de RC1 (multi-palabra en español).
-  - ⏳ **Parte de datos (no hecha):** traducir `categories.name` / `products.description` /
-    display-names de `Color` a es-419 + migración de datos (como `20260827130000` hizo con
-    `products.name`) + actualizar `seed-data/feed.json`. Sin esto, "remera negra" aún no matchea
-    (la palabra de color vive en variantes/desc en inglés). Toca datos en el RDS pre-prod →
-    decisión del usuario.
+  - ✅ **Search por tokens sobre `name` + `description`** — en `master` (`aa877cc`/`9e26d54` vía
+    PR #4). `q` se tokeniza; cada palabra tiene que estar en `name` OR `description`.
+    `products.service.spec.ts` 4/4 + smoke RDS. Cierra el "search matchea `description`" del spec.
+  - ⏳ **Parte de datos (no hecha):** ver "doing".
 - **M7 · B6 · Admin polish.** Analytics, monitor de alertas, config del agente, página de
   `AuditLog` (la tabla + captura ya están en M3), **sesión admin cookie httpOnly + CSRF** (movida
   desde M3 por decisión del usuario). Depende de M3.
