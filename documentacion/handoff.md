@@ -7,6 +7,21 @@
 
 ---
 
+## 2026-09-08 · Plan E2E · M6/B7 search por tokens (rama `feat/e2e-m6-i18n-seed`)
+
+- **`feat/e2e-m6-i18n-seed @ aa877cc`** (cortada de `origin/master 829e0e7` = M0..M4 mergeado),
+  pusheada, sin merge.
+- `ProductsService.search`: `q` se parte en tokens y cada uno tiene que aparecer en `name` **o**
+  `description` (`AND` de `OR`s, insensible a mayúsculas). Antes matcheaba la frase completa contra
+  `name` solo — "bolso de cuero" / "zapatillas correr" no encontraban nada. Sin `q` (o solo
+  espacios) no agrega filtro de texto; category/price/color intactos.
+- `src/products/products.service.spec.ts` nuevo — 4 casos (tokenización, espacios, sin `q`,
+  filtros combinados). `nest build` + `tsc -p tsconfig.build.json` + eslint verdes; smoke contra el
+  RDS pre-prod (instancia temporal `:3001`): 5 consultas multi-palabra → 1 resultado correcto c/u.
+- **Pendiente de B7 (parte de datos, no hecha):** `categories.name` / `products.description` /
+  display-names de `Color` → es-419 + migración de datos + `seed-data/feed.json`. Sin eso "remera
+  negra" no matchea. Toca el RDS pre-prod → espera decisión del usuario.
+
 ## 2026-09-07 · Plan E2E · M3 commiteado/pusheado + M4/B3+B5 código (rama `feat/e2e-m4-lifecycle`)
 
 - **M3 / B6:** el WIP que estaba sin commitear se cerró en `feat/e2e-m3-admin` (`c94c6cd`) y se
