@@ -61,8 +61,16 @@ desde `master` (ver blocked).
   `POST /webhooks/stripe` (raw body), `POST /orders/:id/confirm` (demo), tabla `IdempotencyKey`,
   barrido de `pending_payment` vencidos, `insufficientStockSkus` en el `409` de stock. Depende de
   M1 + M4.
-- **M6 · B7 · i18n del seed (acotado).** Categorías/`store`/descripciones/colores → es-419; search
-  matchea `description`. Paralelo desde M0.
+- **M6 · B7 · i18n del seed (acotado).** Paralelo desde M0.
+  - 🚧 **Search por tokens sobre `name` + `description`** — `feat/e2e-m6-i18n-seed @ aa877cc`,
+    pusheado, sin merge. `q` se tokeniza; cada palabra tiene que estar en `name` OR `description`.
+    Antes: frase completa contra `name` solo. Unit 4/4 + smoke RDS. Cierra el "search matchea
+    `description`" del spec y parte de RC1 (multi-palabra en español).
+  - ⏳ **Parte de datos (no hecha):** traducir `categories.name` / `products.description` /
+    display-names de `Color` a es-419 + migración de datos (como `20260827130000` hizo con
+    `products.name`) + actualizar `seed-data/feed.json`. Sin esto, "remera negra" aún no matchea
+    (la palabra de color vive en variantes/desc en inglés). Toca datos en el RDS pre-prod →
+    decisión del usuario.
 - **M7 · B6 · Admin polish.** Analytics, monitor de alertas, config del agente, página de
   `AuditLog` (la tabla + captura ya están en M3), **sesión admin cookie httpOnly + CSRF** (movida
   desde M3 por decisión del usuario). Depende de M3.
