@@ -31,8 +31,11 @@ merge coordinado de `chore/docs-restructure`.
   el merge de los 3 repos se coordina junto.
 - ✅ Plan E2E · M0 (freeze de contrato) — `documentacion/openapi.json` + sección v1 de `API.md`
   (2026-09-06). Contrato en `demoCompose/docs/plan-e2e.md` §6.
-- ⏳ Plan E2E · M1→M8 (auth+refresh → carrito → admin → ciclo de pedido+eventos → pago → i18n →
-  polish → deploy). Lane en `tasks.md`.
+- ✅ Plan E2E · **M1→M4 en `master` (`829e0e7`)** — auth+refresh, carrito persistido, admin+audit,
+  ciclo de vida del pedido con historial + notificaciones + correlación E2E (`X-E2E-Run`). Loop E2E
+  de M4 verde 2026-09-08 (demoCompose C4/C5/C10 + agente A3).
+- ⏳ Plan E2E · **M5→M8** (pago Stripe → i18n → polish → deploy). Próximo: M5/B4. M6/B7 search por
+  tokens ya hecho en rama `feat/e2e-m6-i18n-seed`; falta la parte de datos es-419. Lane en `tasks.md`.
 - ⏳ Cerrar pendientes post-prueba (ver `tasks.md`).
 
 ## Decisiones de diseño abiertas
