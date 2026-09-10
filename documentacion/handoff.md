@@ -7,6 +7,24 @@
 
 ---
 
+## 2026-09-09 · Plan E2E · M5/B4 — e2e conjunto CERRADO (3 tiers)
+
+- **Corrida `e2e-M5-20260909-01`, 2 escenarios contra `:3000` (`feat/e2e-m5-payments @ ae5564c`,
+  `PAYMENT_PROVIDER=bypass`, RDS pre-prod):**
+  - **Nativo (C3):** app → carrito → checkout → PaymentScreen → confirm bypass → `PaymentSuccessScreen`.
+    `mb-3000.log`: `POST /v1/orders 201` + `POST /v1/orders/<id>/confirm 200`. Order `b9df9d26…` →
+    `paid`; `OrderStatusHistory` `paid/system.meta.e2eRunId = "e2e-M5-20260909-01"` (verificado en RDS).
+  - **Hand-off del chat (C6/A2):** agente `checkout` → `POST /orders 201` (crea `daf1ad38…`); CTA
+    `client:navigate` interceptado por el VM → PaymentScreen → confirm 200 (app). Order `daf1ad38…`
+    → `paid` + fold-in estampado.
+  - 3 tiers verdes (app logcat + `:2500` + `mb-3000.log`), cero 5xx.
+- **Fix `ae5564c`:** la respuesta de `POST /orders` traía `order.paymentIntentId: null` (snapshot
+  de dentro de la tx) — ahora se refleja el id en memoria tras el update.
+- **Follow-up M8:** el `MarketplaceHttpClient` del agente pega a `POST /orders` **sin `/v1`** —
+  anda por el alias `VERSION_NEUTRAL`, que M8 remueve. Anotado para `@agente`.
+- **Pendiente:** merge de `feat/e2e-m5-payments` (`@ ae5564c`) → `master` (PR). C3/C6 de demoCompose
+  van por su propio PR (`feat/e2e-c3-c6-checkout`).
+
 ## 2026-09-08 · Plan E2E · M5/B4 pago (provider-agnostic, bypass por defecto) — rama `feat/e2e-m5-payments`
 
 - **`feat/e2e-m5-payments`** (cortada de `origin/master 59707b4`), pusheada, sin merge. Código
