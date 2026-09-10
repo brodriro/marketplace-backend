@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { AuthModule } from '../auth/auth.module';
 import { BannersModule } from '../banners/banners.module';
 import { CategoriesModule } from '../categories/categories.module';
 import { JwtAuthModule } from '../auth/jwt-auth.module';
@@ -9,6 +11,8 @@ import { AdminAgentConfigController } from './agent-config/admin-agent-config.co
 import { AdminAgentConfigService } from './agent-config/admin-agent-config.service';
 import { AdminAnalyticsController } from './analytics/admin-analytics.controller';
 import { AdminAnalyticsService } from './analytics/admin-analytics.service';
+import { AdminAuthController } from './auth/admin-auth.controller';
+import { AdminCsrfGuard } from './auth/admin-csrf.guard';
 import { AdminAuditController } from './audit/admin-audit.controller';
 import { AuditInterceptor } from './audit/audit.interceptor';
 import { AuditLogService } from './audit/audit-log.service';
@@ -22,6 +26,7 @@ import { AdminUsersController } from './users/admin-users.controller';
 
 @Module({
   imports: [
+    AuthModule,
     JwtAuthModule,
     ProductsModule,
     OrdersModule,
@@ -30,6 +35,7 @@ import { AdminUsersController } from './users/admin-users.controller';
     CategoriesModule,
   ],
   controllers: [
+    AdminAuthController,
     AdminProductsController,
     AdminCategoriesController,
     AdminBannersController,
@@ -46,6 +52,8 @@ import { AdminUsersController } from './users/admin-users.controller';
     AdminAnalyticsService,
     AdminMonitorService,
     AdminAgentConfigService,
+    // CSRF double-submit para mutaciones admin autenticadas por cookie (no-op para Bearer).
+    { provide: APP_GUARD, useClass: AdminCsrfGuard },
   ],
 })
 export class AdminModule {}

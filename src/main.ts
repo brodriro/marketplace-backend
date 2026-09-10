@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AppConfig } from './config/configuration';
@@ -25,8 +26,10 @@ async function bootstrap() {
   });
 
   app.use(helmet());
+  app.use(cookieParser());
   app.enableCors({
     origin: configService.get('cors.origins', { infer: true }),
+    credentials: true, // el panel admin manda la cookie de sesión (M7)
   });
   app.useGlobalPipes(
     new ValidationPipe({
