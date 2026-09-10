@@ -7,6 +7,35 @@
 
 ---
 
+## 2026-09-09 · Plan E2E · M6/B7-data + M7/B6 admin polish (rama `feat/e2e-m7-admin-polish`)
+
+- **`feat/e2e-m7-admin-polish`** (de `origin/master 57f9d22`), pusheada, sin merge. Commits:
+  `fe79cbe` (endpoints analytics/monitor/agent-config) · `a7ae19b` (M6/B7-data) · `dd32d4a` (UI
+  admin + fix drift M4/M6) · `205b0df` (backend cookie/CSRF) · `816a741` (admin/ a modo cookie).
+- **M6/B7-data:** migración `20260909180000_i18n_es419_catalog` (categorías, `products.store`,
+  `colors.name` + `product_variants.color` → es-419) **+ `feed.json`** + `search` matchea color de
+  variante. **Migración SIN aplicar al RDS** (classifier bloqueó `migrate deploy`) — acción del
+  usuario.
+- **M7/B6 backend:** `GET /admin/analytics` (+`/low-stock`), `GET /admin/monitor/{notifications,
+  stock-alerts}`, `GET /admin/agent-config` (checksum md5 del catálogo). Users mgmt ya estaba.
+  Sesión admin **dual-mode**: se agregó cookie httpOnly + CSRF (`POST /admin/auth/login|refresh|
+  logout`, `GET /admin/auth/session`, `JwtStrategy` lee Bearer O cookie, `AdminCsrfGuard`
+  double-submit solo para cookie). Bearer intacto. Smoke curl del flujo cookie/CSRF: login→3
+  cookies, GET con cookie→200, PATCH sin `X-CSRF-Token`→403, con token→200, no-admin→403.
+- **M7/B6 UI (`admin/`):** páginas `/analytics` `/monitor` `/audit-logs` `/agent-config` +
+  nav; fix drift: `OrderStatus` a 7 estados, `ADMIN_ALLOWED_TRANSITIONS` (matriz §6.3),
+  `KNOWN_COLORS` es-419, `status-badge` 7 estados, `orders/[id]` usa la matriz. `next build` verde.
+  ⚠️ El login por cookie del panel **no se probó en runtime** (sin click-through acá) — testear
+  contra un backend levantado; si falla, el backend sigue soportando Bearer.
+- **Coordinadas del 2026-09-09** (`:3000` = master, runId `e2e-M4-20260909-01`): M3 §7.1 (PATCH
+  admin price 99.99→89.99 + variant stock 20→33, delta confirmado read-only en la app,
+  `AuditLog.meta.e2eRunId` en las 6 PATCH → §7.1 M3 fila `y`) + C4/C5 (§4 #4: `daf1ad38`
+  `preparing`→`shipped`+tracking → 2 `Notification order_status_changed`, deep-link a pedido OK;
+  §4 #5: restock crossbody-bag-green 0→10 → `Notification back_in_stock`, `StockAlert` `notified`,
+  deep-link a producto OK). demoCompose: los 2 escenarios ✅.
+- **Follow-ups:** aplicar la migración `20260909180000` al RDS; merge del PR; test runtime del
+  login por cookie; `"remera negra"` (fem.) necesita stemming.
+
 ## 2026-09-09 · Plan E2E · M5/B4 — e2e conjunto CERRADO (3 tiers)
 
 - **Corrida `e2e-M5-20260909-01`, 2 escenarios contra `:3000` (`feat/e2e-m5-payments @ ae5564c`,
