@@ -8,6 +8,43 @@
 
 ---
 
+## 2026-09-10 · Plan E2E · M8 — cutover `/v1` + ensayo del loop completo (rama `feat/e2e-m8-v1-cutover`)
+
+- **`feat/e2e-m8-v1-cutover @ 3309fb6`** (de `origin/master ef97de5`), pusheada, **sin merge** (PR lo
+  abre el usuario).
+- **Cutover `VERSION_NEUTRAL`:** `src/main.ts` → `enableVersioning({ defaultVersion: '1' })` (se saca
+  el alias sin prefijo que sostuvo el cutover de app + agente — los tres ya pegan a `/v1`). Rutas sin
+  `/v1` → `404`. El webhook del proveedor conserva su ruta sin prefijo por decisión propia del
+  controller (`@Controller({ version: VERSION_NEUTRAL })` en `webhooks/`, URL estable en el
+  dashboard). `test/auth.e2e-spec.ts` alineado (rutas a `/v1/...`, el caso "responde también bajo
+  /v1" pasa a "ya no responde sin /v1" → 404). `tsc` + `eslint` verdes.
+- **Ensayo del loop (runId `e2e-M8-20260910-01`, 3 sesiones, 1 pasada):** `:3000` sirviendo
+  `feat/e2e-m8-v1-cutover @ 3309fb6` (= `master ef97de5` + el commit del cutover), `PAYMENT_PROVIDER`
+  sin setear → `bypass`, RDS pre-prod. **6/6 criterios §4 verdes** (verificación app-side por
+  demoCompose, server-side acá):
+  - **#1** PATCH admin sobre "Bolso Bandolera" (`bc505132…`): `price 49.99→44.99` + variante Azul
+    `stock 23→30`. 2 filas `AuditLog` con `meta.e2eRunId`.
+  - **#2** carrito armado desde el chat ("2 Bolso Bandolera azul") aparece en el carrito nativo a
+    precio vivo ($44,99 c/u, subtotal $89,98).
+  - **#3** checkout desde el chat → `POST /v1/orders 201` (`bec865cd…`) → `POST /orders/:id/confirm
+    200` → `paid`. `order_status_history` fila `paid/system` con `meta.e2eRunId`.
+  - **#4** PATCH admin `bec865cd…` `paid→preparing→shipped` (+ `TRK-M8-910 / OCA`). Timeline 4
+    estados (buyer/system/admin/admin); 3 `Notification order_status_changed`; 2 filas `AuditLog`
+    con `meta.e2eRunId`. **Las transiciones admin NO propagan `e2eRunId` a `order_status_history.meta`**
+    (queda `null`) — su correlación va por `AuditLog`. Solo el tramo system lo estampa en el history.
+  - **#5** `StockAlert back_in_stock` seedeado como demo user (`50c2e058…`), ciclo stock Verde
+    (`crossbody-bag-green`) `10→0→15` → `emitBackInStock` → `Notification` (`deepLink` product,
+    `data.sku`), `StockAlert.notified=true`.
+  - **#6** search es-419 con resultados + búsqueda vacía → affordance "no encontré X" (cerrado
+    app+agente, sin PATCH backend).
+- **Archivos clave:** `src/main.ts`, `test/auth.e2e-spec.ts`.
+- **Follow-ups:** merge de `feat/e2e-m8-v1-cutover` + `chore/docs-handoff-restructure` (PRs los abre
+  el usuario); redeploy `api.brodriro.dev` + cutover de `MARKETPLACE_BASE_URL` (lo dispara el
+  usuario, post-ensayo); `@nestjs/swagger` `GET /docs` + `pnpm run openapi:dump` (pendiente M8 doc);
+  wording de la sección Payments de `CLAUDE.md` sobre `OrderStatusHistory.meta` + `e2eRunId` quedó
+  impreciso para el path admin; `discountCode` no se aplica al `total`; `"remera negra"` (fem.)
+  necesita stemming. `:3000` (PID 8868) sigue levantado con el build M8.
+
 ## 2026-09-09 · Plan E2E · M6/B7-data + M7/B6 admin polish (rama `feat/e2e-m7-admin-polish`)
 
 - **`feat/e2e-m7-admin-polish`** (de `origin/master 57f9d22`), **mergeada — PR #8 → `master @ ef97de5`
@@ -250,20 +287,12 @@
   Decisión del usuario: admin = extender la Next.js `admin/` existente, no SSR. Sin cambios de
   código todavía.
 
-## 2026-08-29 · Reestructura de docs (layout de 4 archivos)
-
-- **Qué:** `documentacion/` pasa a `context.md` / `plan.md` / `tasks.md` / `handoff.md`; sección
-  `## Documentación` agregada a `CLAUDE.md`; `handoff-integracion-agente.md` movido a
-  `reference/`. `API.md` se queda como referencia (se genera del código).
-- **Por qué:** modelo común coordinado entre los 3 repos del sistema (agente-mobile,
-  marketplace-backend, demoCompose) para retomar tareas desde un contexto base estable.
-- **Archivos clave:** `documentacion/{context,plan,tasks,handoff}.md`, `CLAUDE.md`,
-  `src/products/sku.util.ts` (path del comentario actualizado).
-- **Follow-ups:** merge coordinado de `chore/docs-restructure` en los 3 repos (sin merge unilateral).
-
 ---
 
 > **Entradas 11+ — una línea cada una** (detalle en `git log`):
+
+### 2026-08-29 — Reestructura de docs (layout de 4 archivos)
+`documentacion/` → `context/plan/tasks/handoff.md` + sección `## Documentación` en `CLAUDE.md`; `handoff-integracion-agente.md` → `reference/`; `API.md` sigue generándose del código. Modelo común coordinado en los 3 repos. Follow-up: merge de `chore/docs-restructure`.
 
 ### 2026-08-27 — Prueba conjunta e2e 4/4 + fix `GET /orders`
 Las 3 sesiones corrieron el e2e contra el RDS (nombres ES, auth real, Home→carrito→`POST /orders`→pago, chat A2UI); 4/4. Fix en el acto: `items[].variant {color,sku}` en `GET /orders` y en la respuesta de `POST /orders`. Commits `554cc70`,`f06fae4` (en `master`). Follow-ups: redeploy `api.brodriro.dev`, `400` stock con `insufficientStockSkus` (hecho en M5), limpieza de usuarios throwaway.
