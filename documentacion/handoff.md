@@ -1,21 +1,27 @@
 # handoff.md — marketplace-backend
 
-> Log reverso de tareas completadas (más reciente arriba). Entradas de 3-6 líneas:
-> **fecha · qué · por qué · archivos clave · follow-ups**. Se mantienen ~20 entradas / ~90 días —
-> el archivo real es `git log`. El detalle profundo de la integración con el agente está en
-> [`reference/handoff-integracion-agente.md`](reference/handoff-integracion-agente.md).
+> Log reverso de tareas completadas (más reciente arriba). **Las ~10 entradas más recientes** van
+> completas (3-6 líneas: **fecha · qué · por qué · archivos clave · follow-ups**). **De la entrada 11
+> en adelante** se comprimen a una línea: `### AAAA-MM-DD — título` + lo esencial + rama/PR/pointer de
+> evidencia — el archivo real es `git log`. El detalle profundo de la integración con el agente está
+> en [`reference/handoff-integracion-agente.md`](reference/handoff-integracion-agente.md).
 
 ---
 
 ## 2026-09-09 · Plan E2E · M6/B7-data + M7/B6 admin polish (rama `feat/e2e-m7-admin-polish`)
 
-- **`feat/e2e-m7-admin-polish`** (de `origin/master 57f9d22`), pusheada, sin merge. Commits:
-  `fe79cbe` (endpoints analytics/monitor/agent-config) · `a7ae19b` (M6/B7-data) · `dd32d4a` (UI
-  admin + fix drift M4/M6) · `205b0df` (backend cookie/CSRF) · `816a741` (admin/ a modo cookie).
+- **`feat/e2e-m7-admin-polish`** (de `origin/master 57f9d22`), **mergeada — PR #8 → `master @ ef97de5`
+  (2026-09-10)**. Commits: `fe79cbe` (endpoints analytics/monitor/agent-config) · `a7ae19b`
+  (M6/B7-data) · `dd32d4a` (UI admin + fix drift M4/M6) · `205b0df` (backend cookie/CSRF) · `816a741`
+  (admin/ a modo cookie) · `a38806b` (docs).
 - **M6/B7-data:** migración `20260909180000_i18n_es419_catalog` (categorías, `products.store`,
   `colors.name` + `product_variants.color` → es-419) **+ `feed.json`** + `search` matchea color de
-  variante. **Migración SIN aplicar al RDS** (classifier bloqueó `migrate deploy`) — acción del
-  usuario.
+  variante. **Migración aplicada al RDS pre-prod (2026-09-10)** vía `prisma migrate deploy` (13/13,
+  `migrate status` "up to date"). Verificada por query: categorías `Bolsos/Calzado/Electrónica/
+  Novedades/Ropa` (+ subtítulos "N productos"), `colors.name` `Negro/Celeste/Azul/Verde/Rojo`,
+  `product_variants.color` 100 % es-419 (0 colores EN del set del seed), `products.store` es-419.
+  Filas no-seed con `store: "Test"/"ZZ"` y una variante `color: "Brown"` son artefactos previos de
+  pruebas admin, ajenos a esta migración.
 - **M7/B6 backend:** `GET /admin/analytics` (+`/low-stock`), `GET /admin/monitor/{notifications,
   stock-alerts}`, `GET /admin/agent-config` (checksum md5 del catálogo). Users mgmt ya estaba.
   Sesión admin **dual-mode**: se agregó cookie httpOnly + CSRF (`POST /admin/auth/login|refresh|
@@ -33,8 +39,9 @@
   `preparing`→`shipped`+tracking → 2 `Notification order_status_changed`, deep-link a pedido OK;
   §4 #5: restock crossbody-bag-green 0→10 → `Notification back_in_stock`, `StockAlert` `notified`,
   deep-link a producto OK). demoCompose: los 2 escenarios ✅.
-- **Follow-ups:** aplicar la migración `20260909180000` al RDS; merge del PR; test runtime del
-  login por cookie; `"remera negra"` (fem.) necesita stemming.
+- **Follow-ups:** test runtime del login por cookie del panel (no probado con click-through);
+  `"remera negra"` (fem.) necesita stemming para matchear; reiniciar `:3000` desde el nuevo `master`
+  (corría código pre-M6/M7 contra el RDS ya i18n).
 
 ## 2026-09-09 · Plan E2E · M5/B4 — e2e conjunto CERRADO (3 tiers)
 
@@ -254,44 +261,18 @@
   `src/products/sku.util.ts` (path del comentario actualizado).
 - **Follow-ups:** merge coordinado de `chore/docs-restructure` en los 3 repos (sin merge unilateral).
 
-## 2026-08-27 · Prueba conjunta end-to-end 4/4 + fix `GET /orders`
+---
 
-- **Qué:** las 3 sesiones (backend, Android, agente A2A) corrieron un test e2e contra el RDS:
-  nombres ES en vivo, auth real, flujo Home→carrito→`POST /orders`→pago, chat A2UI con
-  `VariantSelector`. Pasaron los 4 puntos. Hallazgo corregido en el acto: `GET /orders` y la
-  respuesta de `POST /orders` ahora incluyen `items[].variant: { color, sku }` (Android mostraba
-  "Color: -").
-- **Por qué:** validar la rama `feat/catalog-promo-sku-es-names` antes del merge a master / redeploy.
-- **Archivos clave:** commits `554cc70`, `f06fae4`.
-- **Follow-ups:** (merge a `master` ya hecho, `3ab22f4`…`f06fae4`) redeploy de `api.brodriro.dev`;
-  `400` de stock con `insufficientStockSkus`; job de limpieza de usuarios throwaway. Ver `tasks.md`.
+> **Entradas 11+ — una línea cada una** (detalle en `git log`):
 
-## 2026-08-27 · Fix seed: buscar variantes por (producto, color)
+### 2026-08-27 — Prueba conjunta e2e 4/4 + fix `GET /orders`
+Las 3 sesiones corrieron el e2e contra el RDS (nombres ES, auth real, Home→carrito→`POST /orders`→pago, chat A2UI); 4/4. Fix en el acto: `items[].variant {color,sku}` en `GET /orders` y en la respuesta de `POST /orders`. Commits `554cc70`,`f06fae4` (en `master`). Follow-ups: redeploy `api.brodriro.dev`, `400` stock con `insufficientStockSkus` (hecho en M5), limpieza de usuarios throwaway.
 
-- **Qué:** el seed buscaba variantes por SKU derivado del nombre; al traducir nombres a ES no las
-  encontró y creó 74 variantes duplicadas (79→153). Se borraron las 74 (ninguna en pedidos) y el
-  seed ahora matchea por `(productId, color)`.
-- **Por qué:** efecto colateral de la traducción de nombres; el seed debía seguir siendo idempotente.
-- **Archivos clave:** `prisma/seed.ts`, commit `ae95df8`.
-- **Follow-ups:** ninguno.
+### 2026-08-27 — Fix seed: variantes por (producto, color)
+Al traducir nombres a ES el seed dejó de matchear variantes por SKU y duplicó 74 (79→153); se borraron y el seed ahora matchea `(productId, color)`. Commit `ae95df8`.
 
-## 2026-08-27 · Promo codes + autogeneración de SKU + nombres de producto en español
+### 2026-08-27 — Promo codes + autogeneración de SKU + nombres de producto en ES
+Módulo `src/promo-codes/` (`GET /promo-codes/:code`, público), `sku` opcional + autogen en `POST /admin/products|.../variants` + `regenerate-sku`, migración de datos 19 `products.name` EN→ES. Migraciones `20260827120000`+`20260827130000` aplicadas al RDS + seed. Commit `3ab22f4` (en `master`). Follow-up: redeploy `api.brodriro.dev`.
 
-- **Qué:** módulo `src/promo-codes/` (`GET /promo-codes/:code`, solo validación, público). `sku`
-  opcional en `POST /admin/products` y `.../variants` con autogeneración + endpoint
-  `regenerate-sku`. Migración de datos que traduce 19 `products.name` EN→ES (solo `name`).
-  Migraciones `20260827120000` + `20260827130000` escritas a mano y **aplicadas al RDS** + seed.
-- **Por qué:** pedidos de `agente-mobile` (promo codes) y `mobile` (SKUs editables en el panel) +
-  del usuario (catálogo en español).
-- **Archivos clave:** `prisma/schema.prisma`, `prisma/migrations/20260827*`, `src/promo-codes/`,
-  `src/products/sku.util.ts`, `prisma/seed.ts`, `prisma/seed-data/feed.json`, `documentacion/API.md`,
-  commit `3ab22f4`.
-- **Follow-ups:** merge a `master` hecho después (`master` ya los contiene); falta redeploy de
-  `api.brodriro.dev` (el 2026-08-27 el deployado seguía sin estos endpoints).
-
-## 2026-08-26 · Panel admin — CRUD de productos y categorías
-
-- **Qué:** módulos del dashboard admin (sub-app `admin/`) con operaciones CRUD para productos y
-  categorías.
-- **Archivos clave:** commit `f855488`, `admin/`.
-- **Follow-ups:** `admin/` mantiene su propio `CLAUDE.md` / `AGENTS.md`, fuera del alcance de estos docs.
+### 2026-08-26 — Panel admin: CRUD de productos y categorías
+CRUD de productos y categorías en la sub-app `admin/` (con su propio `CLAUDE.md`/`AGENTS.md`). Commit `f855488`.
