@@ -1,9 +1,15 @@
 import { clearTokens, getRefreshToken, getToken, setTokens } from "./auth";
 import type { AuthTokens } from "./auth";
 import type {
+  AgentConfig,
+  AnalyticsSummary,
   AuditLogEntry,
   Banner,
   Category,
+  LowStockRow,
+  MonitorNotification,
+  MonitorStockAlert,
+  NotificationType,
   Order,
   OrderStatus,
   Paginated,
@@ -11,6 +17,7 @@ import type {
   ProductVariant,
   Role,
   SafeUser,
+  StockAlertType,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/v1";
@@ -264,6 +271,43 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(data),
       }),
+  },
+
+  analytics: {
+    summary: () => request<AnalyticsSummary>("/admin/analytics"),
+    lowStock: (threshold?: number, page = 1, pageSize = 20) =>
+      request<Paginated<LowStockRow> & { threshold: number }>(
+        `/admin/analytics/low-stock?page=${page}&pageSize=${pageSize}${
+          threshold != null ? `&threshold=${threshold}` : ""
+        }`,
+      ),
+  },
+
+  monitor: {
+    notifications: (
+      page = 1,
+      pageSize = 20,
+      opts: { type?: NotificationType; read?: boolean } = {},
+    ) =>
+      request<Paginated<MonitorNotification>>(
+        `/admin/monitor/notifications?page=${page}&pageSize=${pageSize}${
+          opts.type ? `&type=${opts.type}` : ""
+        }${opts.read != null ? `&read=${opts.read}` : ""}`,
+      ),
+    stockAlerts: (
+      page = 1,
+      pageSize = 20,
+      opts: { type?: StockAlertType; notified?: boolean } = {},
+    ) =>
+      request<Paginated<MonitorStockAlert>>(
+        `/admin/monitor/stock-alerts?page=${page}&pageSize=${pageSize}${
+          opts.type ? `&type=${opts.type}` : ""
+        }${opts.notified != null ? `&notified=${opts.notified}` : ""}`,
+      ),
+  },
+
+  agentConfig: {
+    get: () => request<AgentConfig>("/admin/agent-config"),
   },
 
   users: {

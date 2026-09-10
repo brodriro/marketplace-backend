@@ -4,16 +4,39 @@ export type Role = "user" | "admin";
 export type ProductStatus = "Hot" | "New" | "Normal" | "Popular";
 export type OrderStatus =
   | "pending_payment"
-  | "processing"
+  | "paid"
+  | "preparing"
   | "shipped"
-  | "delivered";
+  | "delivered"
+  | "cancelled"
+  | "refunded";
 
+/** Progresión "feliz" del pedido, para render lineal del timeline. */
 export const ORDER_STAGES: OrderStatus[] = [
   "pending_payment",
-  "processing",
+  "paid",
+  "preparing",
   "shipped",
   "delivered",
 ];
+
+/** Los 7 estados (para filtros / selectores). */
+export const ORDER_STATUSES: OrderStatus[] = [
+  ...ORDER_STAGES,
+  "cancelled",
+  "refunded",
+];
+
+/** Espejo de la matriz de transiciones del backend (`src/orders/order-transitions.ts`, §6.3). */
+export const ADMIN_ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  pending_payment: ["paid", "cancelled"],
+  paid: ["preparing", "cancelled", "refunded"],
+  preparing: ["shipped", "refunded"],
+  shipped: ["delivered", "refunded"],
+  delivered: ["refunded"],
+  cancelled: [],
+  refunded: [],
+};
 
 export interface SafeUser {
   id: string;
@@ -127,9 +150,81 @@ export interface Color {
  * Si se agregan colores nuevos en la DB, hay que actualizar esta lista a mano.
  */
 export const KNOWN_COLORS: { name: string; value: string }[] = [
-  { name: "Black", value: "#000000" },
-  { name: "LightBlue", value: "#D4E5F5" },
-  { name: "Blue", value: "#286FB2" },
-  { name: "Green", value: "#86F3B9" },
-  { name: "Red", value: "#F38686" },
+  { name: "Negro", value: "#000000" },
+  { name: "Celeste", value: "#D4E5F5" },
+  { name: "Azul", value: "#286FB2" },
+  { name: "Verde", value: "#86F3B9" },
+  { name: "Rojo", value: "#F38686" },
 ];
+
+// --- M7 / B6 admin polish ---
+
+export interface AnalyticsSummary {
+  orders: {
+    total: number;
+    byStatus: Record<OrderStatus, number>;
+    revenue: string;
+    last7Days: number;
+    last30Days: number;
+  };
+  catalog: {
+    products: number;
+    variants: number;
+    lowStock: number;
+    outOfStock: number;
+    lowStockThreshold: number;
+  };
+  notifications: { total: number; unread: number };
+  topProducts: { productId: string; name: string; unitsSold: number }[];
+}
+
+export interface LowStockRow {
+  id: string;
+  sku: string;
+  color: string;
+  stock: number;
+  productId: string;
+  product: { name: string; image: string | null };
+}
+
+export type NotificationType =
+  | "order_status_changed"
+  | "back_in_stock"
+  | "price_drop";
+export type StockAlertType = "back_in_stock" | "price_drop";
+
+export interface MonitorNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  read: boolean;
+  createdAt: string;
+  productId: string | null;
+  orderId: string | null;
+  user: { id: string; email: string; name: string } | null;
+  product: { id: string; name: string } | null;
+}
+
+export interface MonitorStockAlert {
+  id: string;
+  type: StockAlertType;
+  notified: boolean;
+  createdAt: string;
+  user: { id: string; email: string; name: string } | null;
+  product: { id: string; name: string } | null;
+}
+
+export interface AgentConfig {
+  catalog: {
+    checksum: string;
+    updatedAt: string | null;
+    counts: {
+      categories: number;
+      products: number;
+      variants: number;
+      colors: number;
+    };
+  };
+  agent: { authMode: string; cartMode: string };
+}

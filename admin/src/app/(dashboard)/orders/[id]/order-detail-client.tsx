@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { OrderStatusBadge } from "@/components/status-badge";
 import { ApiError, api } from "@/lib/api-client";
-import { ORDER_STAGES } from "@/lib/types";
+import { ADMIN_ALLOWED_TRANSITIONS } from "@/lib/types";
 import type { Order, OrderStatus } from "@/lib/types";
 
 export function OrderDetailClient({ id }: { id: string }) {
@@ -67,8 +67,11 @@ export function OrderDetailClient({ id }: { id: string }) {
     return <p className="text-muted-foreground">Cargando…</p>;
   }
 
-  const currentIndex = ORDER_STAGES.indexOf(order.status);
-  const allowedStages = ORDER_STAGES.slice(currentIndex);
+  // Estados a los que se puede transicionar (matriz §6.3) + el actual, para el <Select>.
+  const allowedStages: OrderStatus[] = [
+    order.status,
+    ...ADMIN_ALLOWED_TRANSITIONS[order.status],
+  ];
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
