@@ -85,10 +85,11 @@ strings. This is the wire contract clients depend on (see `documentacion/API.md`
 
 ### Orders
 
-`POST /orders` runs in a single Prisma transaction: validates stock per variant, decrements
-stock, and computes `total` from each variant's product `price` at purchase time — if any item
-lacks sufficient stock, nothing is persisted (error message: `Stock insuficiente para <sku>`).
-It also writes the genesis `OrderStatusHistory` row (`pending_payment`, `actorType: buyer`).
+`POST /orders` runs in a single Prisma transaction: validates stock for **all** variants first,
+then decrements and computes `total` from each variant's product `price` at purchase time — if any
+item lacks stock, nothing is persisted and it returns `409 { error, insufficientStockSkus: [...] }`
+(all short SKUs at once; changed from a `400` + text in M5). It also writes the genesis
+`OrderStatusHistory` row (`pending_payment`, `actorType: buyer`).
 
 **M4 (`feat/e2e-m4-lifecycle`, task B3):** the 7-state enum is
 `pending_payment · paid · preparing · shipped · delivered · cancelled · refunded` (`processing`
@@ -106,6 +107,39 @@ with no `status` (or the same status) is still a tracking-only update — no tra
 (`[{ status, at, actorType }]`), not inferred from `status` + timestamps. Every transition (admin
 or buyer) also fires an `order_status_changed` `Notification` for the order's user (best-effort —
 a notification failure is logged, never rethrown).
+
+### Payments — provider-agnostic (M5, `feat/e2e-m5-payments`, task B4)
+
+The backend is **not tied to Stripe**. `src/payments/payment-provider.ts` defines a
+`PaymentProvider` interface (`createIntent`, `verifyWebhook`, `publishableKey`, `supportsWebhook`,
+`allowsUnverifiedConfirm`); `PaymentsModule` picks the implementation from `PAYMENT_PROVIDER`:
+- **`bypass`** (default) — `src/payments/bypass.provider.ts`. No external call: `createIntent`
+  returns a synthetic `clientSecret`, `supportsWebhook=false`, and confirmation is skipped. **It
+  charges nothing.** Used for dev + the E2E loop. **Must be swapped for a real provider before
+  friend & family / production — see `documentacion/plan.md` "Pendiente para producción".**
+- **`stripe`** — `src/payments/stripe.provider.ts`. Real Stripe test; the 3 `STRIPE_*` keys are
+  then required (Zod-refined at boot).
+
+`POST /orders` requires an `Idempotency-Key` header (client-origin: Android → agent → header;
+`400` if missing from M5). The `IdempotencyKey` row (`@@unique([userId, key])`) is the lock:
+created empty up front, filled with the response on success, **deleted if order creation fails**
+so the client can retry. Same key + same body (item order doesn't matter — hashed normalized) →
+the stored response is replayed; same key + different body → `409` with no `insufficientStockSkus`.
+
+`PAYMENTS_ENABLED` (env, default `true`) gates the flow: `true` → `provider.createIntent()`, store
+`Order.paymentIntentId`, return `{ order, payment: { provider, clientSecret, publishableKey } }`,
+cart cleared later on `→ paid`; `false` (M2→M4 window) → no intent, return `{ order }`, cart
+cleared at creation.
+
+`pending_payment → paid` is a **system** transition (`OrdersService.markPaidBySystem`, idempotent):
+`POST /webhooks/stripe` (version-neutral, no auth — signature verified by the provider over
+`req.rawBody`; `main.ts` boots with `rawBody: true`; `404` if the active provider has no webhooks),
+or `POST /orders/:id/confirm` (allowed when `provider.allowsUnverifiedConfirm` — always for
+`bypass`, only with `STRIPE_DEMO_CONFIRM=true` for `stripe`; else `404`). Both clear the cart and
+fire the `order_status_changed` notification. `OrderPaymentSweepService` (`@Cron` every minute)
+cancels `pending_payment` orders older than `ORDER_PAYMENT_TTL_MIN` (default 30) and restocks.
+`OrderStatusHistory.meta` carries `e2eRunId` when a transition request has a valid `X-E2E-Run`
+header.
 
 ### Notifications: `Notification` model (delivery) vs `StockAlert` (subscription)
 

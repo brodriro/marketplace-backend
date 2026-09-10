@@ -10,7 +10,9 @@ import { AppModule } from './app.module';
 import { AppConfig } from './config/configuration';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // `rawBody: true` deja `req.rawBody` (Buffer) disponible para verificar la firma del webhook de
+  // Stripe (`POST /webhooks/stripe`), que necesita los bytes exactos, no el JSON ya parseado.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   const configService = app.get(ConfigService<AppConfig, true>);
 

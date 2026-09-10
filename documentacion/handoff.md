@@ -7,6 +7,53 @@
 
 ---
 
+## 2026-09-09 · Plan E2E · M5/B4 — e2e conjunto CERRADO (3 tiers)
+
+- **Corrida `e2e-M5-20260909-01`, 2 escenarios contra `:3000` (`feat/e2e-m5-payments @ ae5564c`,
+  `PAYMENT_PROVIDER=bypass`, RDS pre-prod):**
+  - **Nativo (C3):** app → carrito → checkout → PaymentScreen → confirm bypass → `PaymentSuccessScreen`.
+    `mb-3000.log`: `POST /v1/orders 201` + `POST /v1/orders/<id>/confirm 200`. Order `b9df9d26…` →
+    `paid`; `OrderStatusHistory` `paid/system.meta.e2eRunId = "e2e-M5-20260909-01"` (verificado en RDS).
+  - **Hand-off del chat (C6/A2):** agente `checkout` → `POST /orders 201` (crea `daf1ad38…`); CTA
+    `client:navigate` interceptado por el VM → PaymentScreen → confirm 200 (app). Order `daf1ad38…`
+    → `paid` + fold-in estampado.
+  - 3 tiers verdes (app logcat + `:2500` + `mb-3000.log`), cero 5xx.
+- **Fix `ae5564c`:** la respuesta de `POST /orders` traía `order.paymentIntentId: null` (snapshot
+  de dentro de la tx) — ahora se refleja el id en memoria tras el update.
+- **Follow-up M8:** el `MarketplaceHttpClient` del agente pega a `POST /orders` **sin `/v1`** —
+  anda por el alias `VERSION_NEUTRAL`, que M8 remueve. Anotado para `@agente`.
+- **Pendiente:** merge de `feat/e2e-m5-payments` (`@ ae5564c`) → `master` (PR). C3/C6 de demoCompose
+  van por su propio PR (`feat/e2e-c3-c6-checkout`).
+
+## 2026-09-08 · Plan E2E · M5/B4 pago (provider-agnostic, bypass por defecto) — rama `feat/e2e-m5-payments`
+
+- **`feat/e2e-m5-payments`** (cortada de `origin/master 59707b4`), pusheada, sin merge. Código
+  completo, `tsc` + `nest build` + eslint + jest verdes. Migración **aplicada al RDS pre-prod**
+  (`20260908180000`, verificada por query). `:3000` levantado con el código M5.
+- **Provider-agnostic** (decisión del usuario 2026-09-08): el pago está detrás de
+  `PaymentProvider` (`src/payments/payment-provider.ts`). `PAYMENT_PROVIDER` elige la impl:
+  - **`bypass`** (default, `bypass.provider.ts`) — sin servicio externo, `clientSecret` sintético,
+    `supportsWebhook=false`, `POST /orders/:id/confirm` marca `paid` sin verificar cobro. **No
+    cobra.** Documentado en `plan.md` → "Pendiente para producción": cambiar a proveedor real
+    antes de F&F/prod.
+  - **`stripe`** (`stripe.provider.ts`) — Stripe test real; las 3 `STRIPE_*` keys pasan a ser
+    obligatorias (Zod).
+- **Schema** (`20260908180000`, aditivo, aplicado): `IdempotencyKey` (`@@unique([userId,key])`,
+  `requestHash`, `response Json`), `Order.paymentIntentId`, `OrderStatusHistory.meta` (fold-in
+  `e2eRunId` acordado con demoCompose).
+- **Código:** `@nestjs/schedule` + `stripe` (sólo lo usa `stripe.provider`). `main.ts` →
+  `rawBody:true`. `OrdersService.create` reescrito: idempotencia (lock por la fila
+  `IdempotencyKey`, replay por `(userId,key)`+`requestHash` normalizado, `409` sin
+  `insufficientStockSkus` si el body difiere), stock valida-todo-antes → `409 { insufficientStockSkus }`,
+  `payment.createIntent()` + `{ order, payment { provider, clientSecret, publishableKey } }` si
+  `PAYMENTS_ENABLED`. `markPaidBySystem` (idempotente) para webhook/confirm/sweep.
+  `WebhooksController` (`VERSION_NEUTRAL`; `404` si el provider no expone webhooks).
+  `OrderPaymentSweepService` (`@Cron` c/min). Unit: `orders.service.spec.ts` (idempotencia + stock).
+- **Follow-ups:** `discountCode` se acepta y hashea pero no se aplica al `total` (integración
+  `promo-codes` = follow-up). Regenerar `openapi.json` es M8 (ya refleja el contrato M5 con
+  `provider: "stripe"` — ahora `provider` puede ser `"bypass"`). **Antes de F&F/prod:** proveedor
+  real + webhook + `STRIPE_DEMO_CONFIRM=false` (ver `plan.md`).
+
 ## 2026-09-08 · Plan E2E · M6/B7 search por tokens (rama `feat/e2e-m6-i18n-seed`)
 
 - **`feat/e2e-m6-i18n-seed @ aa877cc`** (cortada de `origin/master 829e0e7` = M0..M4 mergeado),

@@ -1,16 +1,58 @@
 import { z } from 'zod';
 
-export const envSchema = z.object({
-  NODE_ENV: z
-    .enum(['development', 'production', 'test'])
-    .default('development'),
-  PORT: z.coerce.number().int().positive().default(5000),
-  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
-  JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
-  JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
-  JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
-  CORS_ORIGINS: z.string().default('http://localhost:5000'),
-});
+/** `"true"`/`"false"` explícito — cualquier otra cosa (typo incluido) es error de arranque. */
+const envBool = (def: boolean) =>
+  z
+    .enum(['true', 'false'])
+    .default(def ? 'true' : 'false')
+    .transform((v) => v === 'true');
+
+export const envSchema = z
+  .object({
+    NODE_ENV: z
+      .enum(['development', 'production', 'test'])
+      .default('development'),
+    PORT: z.coerce.number().int().positive().default(5000),
+    DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+    JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
+    JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
+    JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
+    CORS_ORIGINS: z.string().default('http://localhost:5000'),
+
+    // --- Pago (plan E2E §6.5 / hito M5) ---
+    // `PAYMENTS_ENABLED=false` (ventana M2→M4): `POST /orders` no crea intento de pago y vacía el
+    // carrito al crear. `true` (M5+): se crea el intento y el carrito se vacía en `-> paid`.
+    PAYMENTS_ENABLED: envBool(true),
+    // Proveedor de pago. `bypass` (default) no llama a nada externo y saltea la confirmación —
+    // sirve para dev y el e2e; NO cobra. Cambiar a un proveedor real antes de F&F / prod.
+    PAYMENT_PROVIDER: z.enum(['bypass', 'stripe']).default('bypass'),
+    // Obligatorias sólo con PAYMENT_PROVIDER=stripe.
+    STRIPE_SECRET_KEY: z.string().optional(),
+    STRIPE_PUBLISHABLE_KEY: z.string().optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().optional(),
+    STRIPE_CURRENCY: z.string().default('usd'),
+    // Con PAYMENT_PROVIDER=stripe: habilita `POST /orders/:id/confirm` sin webhook real (demo/local).
+    // Con `bypass` es irrelevante (siempre se acepta el confirm).
+    STRIPE_DEMO_CONFIRM: envBool(false),
+    // Minutos que un pedido puede quedar en `pending_payment` antes de que el barrido lo cancele.
+    ORDER_PAYMENT_TTL_MIN: z.coerce.number().int().positive().default(30),
+  })
+  .superRefine((cfg, ctx) => {
+    if (cfg.PAYMENT_PROVIDER !== 'stripe') return;
+    for (const key of [
+      'STRIPE_SECRET_KEY',
+      'STRIPE_PUBLISHABLE_KEY',
+      'STRIPE_WEBHOOK_SECRET',
+    ] as const) {
+      if (!cfg[key]) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} es obligatorio cuando PAYMENT_PROVIDER=stripe`,
+        });
+      }
+    }
+  });
 
 export type EnvConfig = z.infer<typeof envSchema>;
 

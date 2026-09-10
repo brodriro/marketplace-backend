@@ -12,6 +12,16 @@ export interface AppConfig {
   cors: {
     origins: string[];
   };
+  payments: {
+    enabled: boolean;
+    provider: 'bypass' | 'stripe';
+    stripeSecretKey: string;
+    stripePublishableKey: string;
+    stripeWebhookSecret: string;
+    currency: string;
+    demoConfirm: boolean;
+    orderPaymentTtlMin: number;
+  };
 }
 
 export const configuration = (): AppConfig => ({
@@ -30,5 +40,15 @@ export const configuration = (): AppConfig => ({
       .split(',')
       .map((origin) => origin.trim())
       .filter((origin) => origin.length > 0),
+  },
+  payments: {
+    enabled: process.env.PAYMENTS_ENABLED !== 'false',
+    provider: process.env.PAYMENT_PROVIDER === 'stripe' ? 'stripe' : 'bypass',
+    stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? '',
+    stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY ?? '',
+    stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '',
+    currency: process.env.STRIPE_CURRENCY ?? 'usd',
+    demoConfirm: process.env.STRIPE_DEMO_CONFIRM === 'true',
+    orderPaymentTtlMin: parseInt(process.env.ORDER_PAYMENT_TTL_MIN ?? '30', 10),
   },
 });

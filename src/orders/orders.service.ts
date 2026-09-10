@@ -1,16 +1,26 @@
+import { createHash } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   OrderActorType,
   OrderStatus,
   Prisma,
 } from '../generated/prisma/client';
+import type { AppConfig } from '../config/configuration';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { CartService } from '../cart/cart.service';
+import {
+  PAYMENT_PROVIDER,
+  type PaymentProvider,
+} from '../payments/payment-provider';
 import { AdminOrdersQueryDto } from './dto/admin-orders-query.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -46,9 +56,14 @@ type OrderWithHistory = {
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly cart: CartService,
+    @Inject(PAYMENT_PROVIDER) private readonly payments: PaymentProvider,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
   findAllForUser(userId: string) {
@@ -78,70 +93,180 @@ export class OrdersService {
     return { ...order, timeline: this.buildTimeline(order) };
   }
 
-  /** Descuenta stock y crea la orden en una única transacción — si algún ítem no alcanza stock, no se persiste nada (§6.3 del plan). */
-  create(userId: string, dto: CreateOrderDto) {
-    return this.prisma.$transaction(async (tx) => {
-      let total = 0;
-      const itemsData: {
-        variantId: string;
-        quantity: number;
-        unitPrice: number;
-      }[] = [];
+  /**
+   * `POST /orders` (§6.5). Deduplicado por `Idempotency-Key` client-origin:
+   * - misma key + mismo body → se re-devuelve la respuesta guardada (replay);
+   * - misma key + body distinto → `409` sin `insufficientStockSkus`;
+   * - key nueva → se procesa y se guarda la respuesta.
+   *
+   * Valida stock de todas las variantes ANTES de descontar: si falta alguna →
+   * `409 { error, insufficientStockSkus }` y no se persiste nada. Con `PAYMENTS_ENABLED=true`
+   * crea el PaymentIntent y devuelve `{ order, payment }`; con `false` vacía el carrito al crear
+   * y devuelve `{ order }`.
+   */
+  async create(
+    userId: string,
+    dto: CreateOrderDto,
+    idempotencyKey: string,
+  ): Promise<Prisma.JsonObject> {
+    const requestHash = this.hashRequest(dto);
 
-      for (const item of dto.items) {
-        const variant = await tx.productVariant.findUnique({
-          where: { id: item.variantId },
-          include: { product: true },
+    // La fila de idempotencia es el lock: `@@unique([userId, key])`. Se crea vacía y se completa
+    // con la respuesta al final; si falla la creación del pedido, se borra para permitir reintento.
+    try {
+      await this.prisma.idempotencyKey.create({
+        data: { userId, key: idempotencyKey, requestHash, response: {} },
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        const existing = await this.prisma.idempotencyKey.findUnique({
+          where: { userId_key: { userId, key: idempotencyKey } },
         });
-        if (!variant) {
-          throw new NotFoundException(
-            `Variante ${item.variantId} no encontrada`,
-          );
+        if (!existing || existing.requestHash !== requestHash) {
+          throw new ConflictException({
+            error: 'Idempotency-Key ya usada con un body distinto',
+          });
         }
-        if (variant.stock < item.quantity) {
-          throw new BadRequestException(
-            `Stock insuficiente para ${variant.sku}`,
-          );
+        if (this.isEmptyJson(existing.response)) {
+          throw new ConflictException({
+            error: 'Solicitud en curso con esta Idempotency-Key, reintentá',
+          });
         }
-
-        await tx.productVariant.update({
-          where: { id: variant.id },
-          data: { stock: { decrement: item.quantity } },
-        });
-
-        const unitPrice = variant.product.price.toNumber();
-        total += unitPrice * item.quantity;
-        itemsData.push({
-          variantId: variant.id,
-          quantity: item.quantity,
-          unitPrice,
-        });
+        return existing.response as Prisma.JsonObject;
       }
+      throw err;
+    }
 
-      return tx.order.create({
-        data: {
-          userId,
-          status: OrderStatus.pending_payment,
-          total,
-          shippingCity: dto.shippingCity,
-          etaDays: DEFAULT_ETA_DAYS,
-          items: { create: itemsData },
-          // Fila génesis del historial: la creación del pedido es el primer evento del timeline.
-          statusHistory: {
-            create: {
-              status: OrderStatus.pending_payment,
-              actorType: OrderActorType.buyer,
-              actorId: userId,
+    try {
+      const order = await this.prisma.$transaction(async (tx) => {
+        let total = 0;
+        const itemsData: {
+          variantId: string;
+          quantity: number;
+          unitPrice: number;
+        }[] = [];
+        const insufficientStockSkus: string[] = [];
+
+        // Paso 1: validar todo antes de tocar stock.
+        const loaded = await Promise.all(
+          dto.items.map((item) =>
+            tx.productVariant
+              .findUnique({
+                where: { id: item.variantId },
+                include: { product: true },
+              })
+              .then((variant) => ({ item, variant })),
+          ),
+        );
+        for (const { item, variant } of loaded) {
+          if (!variant) {
+            throw new NotFoundException(
+              `Variante ${item.variantId} no encontrada`,
+            );
+          }
+          if (variant.stock < item.quantity) {
+            insufficientStockSkus.push(variant.sku);
+            continue;
+          }
+          const unitPrice = variant.product.price.toNumber();
+          total += unitPrice * item.quantity;
+          itemsData.push({
+            variantId: variant.id,
+            quantity: item.quantity,
+            unitPrice,
+          });
+        }
+        if (insufficientStockSkus.length > 0) {
+          throw new ConflictException({
+            error: 'Stock insuficiente',
+            insufficientStockSkus,
+          });
+        }
+
+        // Paso 2: descontar stock y crear el pedido.
+        for (const item of itemsData) {
+          await tx.productVariant.update({
+            where: { id: item.variantId },
+            data: { stock: { decrement: item.quantity } },
+          });
+        }
+
+        return tx.order.create({
+          data: {
+            userId,
+            status: OrderStatus.pending_payment,
+            total,
+            shippingCity: dto.shippingCity,
+            etaDays: DEFAULT_ETA_DAYS,
+            items: { create: itemsData },
+            statusHistory: {
+              create: {
+                status: OrderStatus.pending_payment,
+                actorType: OrderActorType.buyer,
+                actorId: userId,
+              },
             },
           },
-        },
-        include: {
-          items: {
-            include: { variant: { select: { color: true, sku: true } } },
+          include: {
+            items: {
+              include: { variant: { select: { color: true, sku: true } } },
+            },
           },
-        },
+        });
       });
-    });
+
+      const paymentsEnabled = this.config.get('payments.enabled', {
+        infer: true,
+      });
+      let payment:
+        | { provider: string; clientSecret: string; publishableKey: string }
+        | undefined;
+
+      if (paymentsEnabled) {
+        const intent = await this.payments.createIntent({
+          amountDecimal: order.total.toNumber(),
+          orderId: order.id,
+          userId,
+          idempotencyKey,
+        });
+        await this.prisma.order.update({
+          where: { id: order.id },
+          data: { paymentIntentId: intent.id },
+        });
+        // El `order` es el snapshot de dentro de la tx (antes del update) — reflejar el id acá
+        // para que la respuesta de `POST /orders` no traiga `paymentIntentId: null`.
+        order.paymentIntentId = intent.id;
+        payment = {
+          provider: this.payments.name,
+          clientSecret: intent.clientSecret,
+          publishableKey: this.payments.publishableKey,
+        };
+      } else {
+        // Ventana M2→M4: sin pago real, el carrito se vacía al crear el pedido.
+        await this.cart.clear(userId);
+      }
+
+      const response = {
+        order,
+        ...(payment ? { payment } : {}),
+      } as unknown as Prisma.JsonObject;
+
+      await this.prisma.idempotencyKey.update({
+        where: { userId_key: { userId, key: idempotencyKey } },
+        data: { response },
+      });
+
+      return response;
+    } catch (err) {
+      // El pedido no se persistió (o quedó a medias): liberar la key para que el cliente reintente.
+      await this.prisma.idempotencyKey
+        .delete({ where: { userId_key: { userId, key: idempotencyKey } } })
+        .catch(() => undefined);
+      throw err;
+    }
   }
 
   /** Todos los pedidos, de todos los usuarios — solo para uso admin. */
@@ -327,7 +452,161 @@ export class OrdersService {
     return { ...updated, timeline: this.buildTimeline(updated) };
   }
 
+  /**
+   * Transición `pending_payment -> paid` disparada por el sistema: webhook de Stripe
+   * (`payment_intent.succeeded`), `POST /orders/:id/confirm` (demo) o cualquier otra vía server.
+   * Idempotente: si el pedido ya no está en `pending_payment` no hace nada. Vacía el carrito del
+   * comprador y dispara la notificación. `e2eRunId` se estampa en `meta` si vino en la request.
+   */
+  async markPaidBySystem(
+    orderId: string,
+    opts: { e2eRunId?: string } = {},
+  ): Promise<{ changed: boolean }> {
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id: orderId } });
+      if (!order) {
+        throw new NotFoundException('Pedido no encontrado');
+      }
+      if (order.status !== OrderStatus.pending_payment) {
+        return null;
+      }
+      return tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: OrderStatus.paid,
+          statusHistory: {
+            create: {
+              status: OrderStatus.paid,
+              actorType: OrderActorType.system,
+              meta: opts.e2eRunId ? { e2eRunId: opts.e2eRunId } : undefined,
+            },
+          },
+        },
+      });
+    });
+
+    if (!updated) {
+      return { changed: false };
+    }
+
+    await this.cart.clear(updated.userId).catch((err) => {
+      this.logger.warn(
+        `No se pudo vaciar el carrito de ${updated.userId} tras el pago: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    });
+    await this.notifications.emitOrderStatusChanged({
+      userId: updated.userId,
+      orderId: updated.id,
+      fromStatus: OrderStatus.pending_payment,
+      toStatus: OrderStatus.paid,
+    });
+    return { changed: true };
+  }
+
+  /**
+   * `POST /orders/:id/confirm` — marca `paid` sin verificar el cobro contra el proveedor.
+   * Sólo disponible si el proveedor lo permite (`bypass` siempre; `stripe` con `STRIPE_DEMO_CONFIRM`);
+   * si no → `404`. Valida ownership (mismo 404 que `findOne`) y delega en `markPaidBySystem`.
+   */
+  async confirmDemo(userId: string, id: string, e2eRunId?: string) {
+    if (!this.payments.allowsUnverifiedConfirm) {
+      throw new NotFoundException('Pedido no encontrado');
+    }
+    const order = await this.prisma.order.findUnique({ where: { id } });
+    if (!order || order.userId !== userId) {
+      throw new NotFoundException('Pedido no encontrado');
+    }
+    if (order.status === OrderStatus.paid) {
+      return this.findOne(userId, id); // idempotente: ya confirmado
+    }
+    if (order.status !== OrderStatus.pending_payment) {
+      throw new ConflictException({
+        error: `No se puede confirmar un pedido en estado ${order.status}`,
+        allowedTransitions: ALLOWED_TRANSITIONS[order.status],
+      });
+    }
+    await this.markPaidBySystem(id, { e2eRunId });
+    return this.findOne(userId, id);
+  }
+
+  /**
+   * Barrido de pedidos `pending_payment` vencidos (`ORDER_PAYMENT_TTL_MIN`, §6.5): pasan a
+   * `cancelled`, reponen stock y notifican al comprador. Lo llama un cron; devuelve cuántos cerró.
+   */
+  async expirePendingPayments(): Promise<number> {
+    const ttlMin = this.config.get('payments.orderPaymentTtlMin', {
+      infer: true,
+    });
+    const cutoff = new Date(Date.now() - ttlMin * 60_000);
+    const stale = await this.prisma.order.findMany({
+      where: { status: OrderStatus.pending_payment, createdAt: { lt: cutoff } },
+      include: { items: true },
+    });
+
+    for (const order of stale) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const fresh = await tx.order.findUnique({ where: { id: order.id } });
+          if (!fresh || fresh.status !== OrderStatus.pending_payment) {
+            return;
+          }
+          await this.restock(tx, order.items);
+          await tx.order.update({
+            where: { id: order.id },
+            data: {
+              status: OrderStatus.cancelled,
+              statusHistory: {
+                create: {
+                  status: OrderStatus.cancelled,
+                  actorType: OrderActorType.system,
+                  note: 'Pago no confirmado dentro del plazo',
+                },
+              },
+            },
+          });
+        });
+        await this.notifications.emitOrderStatusChanged({
+          userId: order.userId,
+          orderId: order.id,
+          fromStatus: OrderStatus.pending_payment,
+          toStatus: OrderStatus.cancelled,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `No se pudo expirar el pedido ${order.id}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+    return stale.length;
+  }
+
   // ---------------------------------------------------------------------------
+  private hashRequest(dto: CreateOrderDto): string {
+    const normalized = {
+      shippingCity: dto.shippingCity.trim(),
+      discountCode: dto.discountCode?.trim() ?? null,
+      items: [...dto.items]
+        .map((i) => ({ variantId: i.variantId, quantity: i.quantity }))
+        .sort((a, b) => a.variantId.localeCompare(b.variantId)),
+    };
+    return createHash('sha256')
+      .update(JSON.stringify(normalized))
+      .digest('hex');
+  }
+
+  private isEmptyJson(value: Prisma.JsonValue): boolean {
+    return (
+      value != null &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      Object.keys(value).length === 0
+    );
+  }
+
   private trackingPatch(dto: UpdateOrderStatusDto) {
     return {
       ...(dto.trackingNumber !== undefined
