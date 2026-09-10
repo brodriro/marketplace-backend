@@ -2,38 +2,41 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { clearTokens, decodeJwtPayload, getToken, isTokenValid } from "@/lib/auth";
-import type { DecodedJwt } from "@/lib/auth";
-import { api } from "@/lib/api-client";
+import type { SessionUser } from "@/lib/auth";
+import { ApiError, api } from "@/lib/api-client";
 
+/**
+ * Sesión del panel por cookie httpOnly (backend M7 / B6). No hay token legible en el cliente: se
+ * consulta `GET /admin/auth/session` al montar. 401 → al login.
+ */
 export function useAuth() {
   const router = useRouter();
-  const [user, setUser] = useState<DecodedJwt | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    const token = getToken();
-    if (!isTokenValid(token)) {
-      clearTokens();
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- verificación de sesión al montar, no un loop de render
-      setChecked(true);
-      router.replace("/login");
-      return;
-    }
-    const decoded = decodeJwtPayload(token!);
-    if (!decoded || decoded.role !== "admin") {
-      clearTokens();
-      setChecked(true);
-      router.replace("/login");
-      return;
-    }
-    setUser(decoded);
-    setChecked(true);
+    let cancelled = false;
+    api
+      .session()
+      .then((res) => {
+        if (cancelled) return;
+        setUser(res.user);
+        setChecked(true);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setChecked(true);
+        if (err instanceof ApiError && err.status === 401) {
+          router.replace("/login");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   function logout() {
-    void api.logout();
-    router.replace("/login");
+    void api.logout().finally(() => router.replace("/login"));
   }
 
   return { user, checked, logout };

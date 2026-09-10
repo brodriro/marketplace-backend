@@ -27,18 +27,18 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { ApiError, api } from "@/lib/api-client";
-import { decodeJwtPayload, getToken } from "@/lib/auth";
+import { useAuth } from "@/hooks/use-auth";
 import type { Role, SafeUser } from "@/lib/types";
 
 export function UserEditClient({ id }: { id: string }) {
   const router = useRouter();
+  const { user: currentUser } = useAuth();
   const [user, setUser] = useState<SafeUser | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const currentUserId = decodeJwtPayload(getToken() ?? "")?.sub;
-  const isSelf = currentUserId === id;
+  const isSelf = currentUser?.id === id;
 
   useEffect(() => {
     api.users

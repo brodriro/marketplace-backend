@@ -1,5 +1,5 @@
-import { clearTokens, getRefreshToken, getToken, setTokens } from "./auth";
-import type { AuthTokens } from "./auth";
+import { getCsrfToken } from "./auth";
+import type { SessionUser } from "./auth";
 import type {
   AgentConfig,
   AnalyticsSummary,
@@ -36,7 +36,6 @@ export class ApiError extends Error {
 }
 
 function redirectToLogin(): void {
-  clearTokens();
   if (typeof window !== "undefined") {
     // Reset duro intencional (no useRouter): este módulo no es un componente/hook, y una
     // sesión vencida debe limpiar todo el estado de la app, no solo navegar.
@@ -45,24 +44,21 @@ function redirectToLogin(): void {
   }
 }
 
+const MUTATING = new Set(["POST", "PATCH", "PUT", "DELETE"]);
+
 /** Un solo refresh en vuelo a la vez: varios 401 concurrentes comparten la misma promesa. */
 let refreshInFlight: Promise<boolean> | null = null;
 
 async function tryRefresh(): Promise<boolean> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return false;
-
   refreshInFlight ??= (async () => {
     try {
-      const res = await fetch(`${API_URL}/auth/refresh`, {
+      // Sin body: el refresh token va en la cookie httpOnly `admin_refresh`. El server rota las
+      // cookies (`admin_session` / `admin_refresh` / `admin_csrf`) en la respuesta.
+      const res = await fetch(`${API_URL}/admin/auth/refresh`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken }),
+        credentials: "include",
       });
-      if (!res.ok) return false;
-      const tokens = (await res.json()) as AuthTokens;
-      setTokens(tokens);
-      return true;
+      return res.ok;
     } catch {
       return false;
     } finally {
@@ -74,12 +70,14 @@ async function tryRefresh(): Promise<boolean> {
 }
 
 async function rawRequest(path: string, init: RequestInit): Promise<Response> {
-  const token = getToken();
+  const method = (init.method ?? "GET").toUpperCase();
+  const csrf = MUTATING.has(method) ? getCsrfToken() : null;
   return fetch(`${API_URL}${path}`, {
     ...init,
+    credentials: "include", // cookie de sesión admin (httpOnly)
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(csrf ? { "X-CSRF-Token": csrf } : {}),
       ...(E2E_RUN_ID ? { "X-E2E-Run": E2E_RUN_ID } : {}),
       ...init.headers,
     },
@@ -116,21 +114,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const api = {
   login: (email: string, password: string) =>
-    request<AuthTokens>("/auth/login", {
+    request<{ user: SessionUser; csrfToken: string }>("/admin/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
 
+  session: () => request<{ user: SessionUser }>("/admin/auth/session"),
+
   logout: async () => {
-    const refreshToken = getRefreshToken();
-    if (refreshToken) {
-      // best-effort: revoca la familia server-side; si falla igual limpiamos local
-      await request<void>("/auth/logout", {
-        method: "POST",
-        body: JSON.stringify({ refreshToken }),
-      }).catch(() => undefined);
-    }
-    clearTokens();
+    await request<void>("/admin/auth/logout", { method: "POST" }).catch(
+      () => undefined,
+    );
   },
 
   auditLogs: {
