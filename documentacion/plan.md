@@ -10,13 +10,15 @@ reviews, pedidos, alertas de stock) y la integración con el agente conversacion
 (`agente-mobile`).
 
 **Foco actual: plan E2E cross-repo** ("loop completo app + dashboard admin", coordinado con
-`demoCompose` y `agente-mobile`; canónico en `demoCompose/docs/plan-e2e.md`). `@backend` lleva el
+`demoCompose` y `agente-mobile`; canónico en `demoCompose/docs/plan-e2e.md`). `@backend` llevó el
 grueso: auth con roles + refresh, carrito persistido, ciclo de vida del pedido con historial y
-eventos, pago Stripe test, extender el admin, OpenAPI + `/v1`. Contrato congelado en M0
-(2026-09-06); la implementación arranca en M1. Lane detallada en [`tasks.md`](tasks.md).
+eventos, pago provider-agnostic, extender el admin, OpenAPI + `/v1`. **M0→M8 completos en código**
+(2026-09-10); ensayo del loop `e2e-M8-20260910-01` 6/6 §4 verde. Lane detallada en
+[`tasks.md`](tasks.md).
 
-En paralelo sigue pendiente **consolidar**: redeploy de `api.brodriro.dev` desde `master` y el
-merge coordinado de `chore/docs-restructure`.
+Queda **consolidar / desplegar**: mergear `feat/e2e-m8-v1-cutover` + `chore/docs-handoff-restructure`
+(usuario), `@nestjs/swagger` + `openapi:dump` (cola de M8), y el redeploy de `api.brodriro.dev`
+desde `master` + cutover de `MARKETPLACE_BASE_URL`.
 
 ## Hitos
 
@@ -31,12 +33,15 @@ merge coordinado de `chore/docs-restructure`.
   el merge de los 3 repos se coordina junto.
 - ✅ Plan E2E · M0 (freeze de contrato) — `documentacion/openapi.json` + sección v1 de `API.md`
   (2026-09-06). Contrato en `demoCompose/docs/plan-e2e.md` §6.
-- ✅ Plan E2E · **M1→M4 en `master` (`59707b4`)** — auth+refresh, carrito persistido, admin+audit,
-  ciclo de vida del pedido con historial + notificaciones + correlación E2E (`X-E2E-Run`). Loop E2E
-  de M4 verde 2026-09-08 (demoCompose C4/C5/C10 + agente A3). B7 search por tokens también en master.
-- ⏳ Plan E2E · **M5→M8** (pago Stripe → i18n de datos es-419 → polish → deploy). Próximo: M5/B4.
-  Lane en `tasks.md`.
-- ⏳ Cerrar pendientes post-prueba (ver `tasks.md`).
+- ✅ Plan E2E · **M1→M7 en `master` (`ef97de5`)** — auth+refresh, carrito persistido, admin+audit,
+  ciclo de vida del pedido con historial + notificaciones + correlación E2E (`X-E2E-Run`), pago
+  provider-agnostic (`bypass` default / `stripe`), search por tokens + i18n es-419 del catálogo,
+  admin polish (analytics/monitor/agent-config) + sesión admin cookie httpOnly/CSRF. Loops E2E M4
+  (`e2e-M4-2026090{8,9}`) y M5 (`e2e-M5-20260909-01`) verdes.
+- 🔷 Plan E2E · **M8** — cutover `/v1` (remoción de `VERSION_NEUTRAL`) en `feat/e2e-m8-v1-cutover`
+  (sin merge); ensayo del loop completo `e2e-M8-20260910-01` **6/6 §4 verde** (2026-09-10). Falta:
+  merge + `@nestjs/swagger`/`openapi:dump` + redeploy.
+- ⏳ Consolidar: merge de las 2 ramas de docs/M8, redeploy `api.brodriro.dev`, `openapi:dump`.
 
 ## Decisiones de diseño abiertas
 
@@ -69,9 +74,9 @@ Cosas que están OK para dev / el e2e del loop pero **hay que resolver antes de 
   Contrato de respuesta de `POST /orders` (igual para cualquier proveedor):
   `{ order, payment: { provider, clientSecret, publishableKey } }`. El cliente **branchea por
   `payment.provider`**: `"bypass"` → saltear la pantalla de pago y llamar directo a
-  `POST /orders/:id/confirm`; `"stripe"` → Payment Sheet real. Estado en
-  `feat/e2e-m5-payments @ cab232e` (pusheada, `:3000` verificado end-to-end contra el RDS pre-prod
-  con `bypass`).
+  `POST /orders/:id/confirm`; `"stripe"` → Payment Sheet real. M5 ya está en `master` (PR #7); el
+  ensayo M8 (`e2e-M8-20260910-01`, 2026-09-10) corrió el loop entero con `bypass` contra el RDS
+  pre-prod.
   **Antes de F&F / prod:** setear `PAYMENT_PROVIDER=stripe` (o implementar otro proveedor: una
   clase que cumpla `PaymentProvider` + su rama en `PaymentsModule`), cargar sus credenciales,
   configurar el webhook (`POST /webhooks/stripe`, firma), y `STRIPE_DEMO_CONFIRM=false` para que
