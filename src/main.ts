@@ -1,8 +1,4 @@
-import {
-  ValidationPipe,
-  VERSION_NEUTRAL,
-  VersioningType,
-} from '@nestjs/common';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
@@ -18,11 +14,12 @@ async function bootstrap() {
   const configService = app.get(ConfigService<AppConfig, true>);
 
   // Versionado por URI (plan E2E, hito M1): el contrato v1 vive bajo `/v1/...`.
-  // `VERSION_NEUTRAL` mantiene las rutas sin prefijo respondiendo durante el cutover de los
-  // clientes (app + agente); se remueve en M8 cuando los tres estén en `/v1`.
+  // El alias sin prefijo (`VERSION_NEUTRAL`) que sostuvo el cutover de los clientes (app + agente)
+  // se removió en M8 — los tres ya pegan a `/v1`. El webhook del proveedor mantiene su ruta sin
+  // prefijo por decisión propia (`@Controller({ version: VERSION_NEUTRAL })` en `webhooks/`).
   app.enableVersioning({
     type: VersioningType.URI,
-    defaultVersion: ['1', VERSION_NEUTRAL],
+    defaultVersion: '1',
   });
 
   app.use(helmet());
