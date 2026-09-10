@@ -22,15 +22,10 @@ import {
 } from "@/components/ui/table";
 import { OrderStatusBadge } from "@/components/status-badge";
 import { ApiError, api } from "@/lib/api-client";
+import { ORDER_STATUSES } from "@/lib/types";
 import type { Order, OrderStatus } from "@/lib/types";
 
-const STATUS_OPTIONS: (OrderStatus | "all")[] = [
-  "all",
-  "pending_payment",
-  "processing",
-  "shipped",
-  "delivered",
-];
+const STATUS_OPTIONS: (OrderStatus | "all")[] = ["all", ...ORDER_STATUSES];
 
 function OrdersPageContent() {
   const router = useRouter();

@@ -163,7 +163,28 @@ Pre-`master`/pre-M4 behaviour (still live on `master`): no `Notification` model 
 ### Color is a lookup table, not a FK
 
 `Color` (name/value) is a catalog of valid color values, but `ProductVariant.color` is a plain
-string column, not a foreign key — validity is enforced in the DTO layer, not the DB.
+string column, not a foreign key — validity is enforced in the DTO layer, not the DB. Since M6/B7
+(`feat/e2e-m7-admin-polish`) the catalog values are es-419 (`Negro`/`Azul`/`Verde`/`Rojo`/`Celeste`)
+via the data migration `20260909180000_i18n_es419_catalog` (also translates category names/subtitles
+and `Product.store`). `GET /products/search` tokenizes `q` and matches each token against `name`,
+`description`, **or** a visible variant's `color`.
+
+### Admin polish (M7 / B6, `feat/e2e-m7-admin-polish`)
+
+Read-only dashboards under `src/admin/`: `GET /admin/analytics` (orders by status, revenue,
+7/30-day counts, catalog + low-stock counts, top products), `GET /admin/analytics/low-stock`,
+`GET /admin/monitor/notifications` + `/stock-alerts` (global views), `GET /admin/agent-config`
+(md5 checksum of a canonical catalog serialization + counts). Not audited (GET). The Next.js
+`admin/` app has matching pages.
+
+**Admin session is dual-mode.** The mobile `Authorization: Bearer` still works everywhere. The
+admin app now also authenticates by **httpOnly cookie**: `POST /admin/auth/login` (checks
+`role: admin`) sets `admin_session` (access, httpOnly), `admin_refresh` (refresh, httpOnly),
+`admin_csrf` (JS-readable); `POST /admin/auth/refresh` rotates them from the cookie;
+`GET /admin/auth/session` introspects. `JwtStrategy` extracts the JWT from the Bearer header **or**
+the `admin_session` cookie. `AdminCsrfGuard` (`APP_GUARD`) enforces double-submit CSRF
+(`X-CSRF-Token` == `admin_csrf` cookie) on `/admin/*` mutations **only when cookie-authed** — Bearer
+requests skip it. `main.ts` uses `cookie-parser` and CORS `credentials: true`.
 
 ### Global setup (`src/main.ts` / `src/app.module.ts`)
 

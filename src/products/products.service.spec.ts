@@ -35,42 +35,33 @@ describe('ProductsService.search', () => {
   const run = (q?: string): Promise<unknown> =>
     service.search({ q, pageSize: 20 } satisfies SearchProductsQueryDto);
 
-  it('parte `q` en tokens y exige cada uno en name OR description', async () => {
+  const ci = Prisma.QueryMode.insensitive;
+  const tokenOr = (token: string) => ({
+    OR: [
+      { name: { contains: token, mode: ci } },
+      { description: { contains: token, mode: ci } },
+      {
+        variants: {
+          some: { visible: true, color: { contains: token, mode: ci } },
+        },
+      },
+    ],
+  });
+
+  it('parte `q` en tokens y exige cada uno en name OR description OR color de variante', async () => {
     await run('mochila viajera cuero');
 
     const where = whereOf();
     expect(where.visible).toBe(true);
     expect(where.AND).toHaveLength(3);
     expect(where.AND).toEqual(
-      ['mochila', 'viajera', 'cuero'].map((token) => ({
-        OR: [
-          { name: { contains: token, mode: Prisma.QueryMode.insensitive } },
-          {
-            description: {
-              contains: token,
-              mode: Prisma.QueryMode.insensitive,
-            },
-          },
-        ],
-      })),
+      ['mochila', 'viajera', 'cuero'].map((token) => tokenOr(token)),
     );
   });
 
   it('colapsa espacios múltiples y bordes en un solo token', async () => {
     await run('  remera   ');
-    expect(whereOf().AND).toEqual([
-      {
-        OR: [
-          { name: { contains: 'remera', mode: Prisma.QueryMode.insensitive } },
-          {
-            description: {
-              contains: 'remera',
-              mode: Prisma.QueryMode.insensitive,
-            },
-          },
-        ],
-      },
-    ]);
+    expect(whereOf().AND).toEqual([tokenOr('remera')]);
   });
 
   it('sin `q` (o solo espacios) no agrega filtro de texto', async () => {

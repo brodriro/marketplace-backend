@@ -1,23 +1,23 @@
 {
   "colors": [
     {
-      "name": "Black",
+      "name": "Negro",
       "value": "#000000"
     },
     {
-      "name": "LightBlue",
+      "name": "Celeste",
       "value": "#D4E5F5"
     },
     {
-      "name": "Blue",
+      "name": "Azul",
       "value": "#286FB2"
     },
     {
-      "name": "Green",
+      "name": "Verde",
       "value": "#86F3B9"
     },
     {
-      "name": "Red",
+      "name": "Rojo",
       "value": "#F38686"
     }
   ],
@@ -40,8 +40,8 @@
   ],
   "categories": [
     {
-      "name": "New Arrivals",
-      "subtitle": "208 Products",
+      "name": "Novedades",
+      "subtitle": "208 productos",
       "image": "https://justintime.in/cdn/shop/files/Top_10_Smartwatches_for_Men__2024_May_Desktop_f5cb9a2d-a39b-489c-a22e-34261a0c356a_1500x.png?v=1717665738",
       "position": "left",
       "products": [
@@ -51,13 +51,13 @@
           "price": 199.99,
           "image": "https://http2.mlstatic.com/D_NQ_NP_763222-MLU74222783373_012024-O.webp",
           "like": false,
-          "store": "Alpha Store",
+          "store": "Tienda Alfa",
           "searched": "1.2k Search today",
           "status": "New",
           "colors": [
-            "Black",
-            "Blue",
-            "Green"
+            "Negro",
+            "Azul",
+            "Verde"
           ],
           "location": [
             "San Diego"
@@ -66,18 +66,18 @@
         {
           "name": "Auriculares Pro",
           "description": "Auriculares con cancelación de ruido activa y sonido Hi-Fi.",
-          "price": 149.50,
+          "price": 149.5,
           "image": "https://http2.mlstatic.com/D_NQ_NP_819285-MPE72549492487_102023-O.webp",
           "like": false,
-          "store": "Beta Boutique",
+          "store": "Boutique Beta",
           "searched": "900 Search today",
           "status": "Hot",
           "colors": [
-            "Black",
-            "LightBlue",
-            "Red",
-            "Green",
-            "Blue"
+            "Negro",
+            "Celeste",
+            "Rojo",
+            "Verde",
+            "Azul"
           ],
           "location": [
             "New York",
@@ -88,16 +88,16 @@
         {
           "name": "Dron 4K",
           "description": "Dron compacto con cámara 4K y estabilización gimbal.",
-          "price": 349.00,
+          "price": 349,
           "image": "https://5.imimg.com/data5/SELLER/Default/2024/10/461345605/ZE/QF/NM/84394228/izi-spectra-combo-drone-with-camera-4k-hdr-cinematic-1-cmos-sensor-500x500.png",
           "like": false,
-          "store": "Gamma Goods",
+          "store": "Artículos Gamma",
           "searched": "700 Search today",
           "status": "Normal",
           "colors": [
-            "Black",
-            "Green",
-            "Blue"
+            "Negro",
+            "Verde",
+            "Azul"
           ],
           "location": [
             "Amsterdam"
@@ -109,15 +109,15 @@
           "price": 29.99,
           "image": "https://m.media-amazon.com/images/I/51pbKzrAd9L.jpg",
           "like": false,
-          "store": "Delta Deals",
+          "store": "Ofertas Delta",
           "searched": "1.0k Search today",
           "status": "Normal",
           "colors": [
-            "Black",
-            "LightBlue",
-            "Red",
-            "Green",
-            "Blue"
+            "Negro",
+            "Celeste",
+            "Rojo",
+            "Verde",
+            "Azul"
           ],
           "location": [
             "New York"
@@ -126,24 +126,24 @@
       ]
     },
     {
-      "name": "Clothes",
-      "subtitle": "85 Products",
+      "name": "Ropa",
+      "subtitle": "85 productos",
       "image": "https://t4.ftcdn.net/jpg/03/13/65/17/360_F_313651795_OUrd7HrFYuxo9LXuuREFvRyIPeEfVSLj.jpg",
       "position": "right",
       "products": [
         {
           "name": "Chaqueta de Jean",
           "description": "Chaqueta vaquera clásica con corte ajustado.",
-          "price": 89.90,
+          "price": 89.9,
           "image": "https://lsco.scene7.com/is/image/lsco/A06320000-front-pdp?fmt=jpeg&qlt=70&resMode=sharp2&fit=crop,1&op_usm=0.6,0.6,8&wid=880&hei=880",
           "like": false,
-          "store": "Alpha Store",
+          "store": "Tienda Alfa",
           "searched": "1.3k Search today",
           "status": "Popular",
           "colors": [
-            "Blue",
-            "LightBlue",
-            "Black"
+            "Azul",
+            "Celeste",
+            "Negro"
           ],
           "location": [
             "San Diego",
@@ -157,15 +157,15 @@
           "price": 24.99,
           "image": "https://m.media-amazon.com/images/I/61ETIupdWLL._AC_UY1000_.jpg",
           "like": false,
-          "store": "Epsilon Emporium",
+          "store": "Emporio Épsilon",
           "searched": "800 Search today",
           "status": "Normal",
           "colors": [
-            "Red",
-            "Black",
-            "Green",
-            "Blue",
-            "LightBlue"
+            "Rojo",
+            "Negro",
+            "Verde",
+            "Azul",
+            "Celeste"
           ],
           "location": [
             "New York"
@@ -174,16 +174,16 @@
         {
           "name": "Cinturón de Cuero",
           "description": "Cinturón de piel genuina con hebilla metálica.",
-          "price": 45.00,
+          "price": 45,
           "image": "https://redhorns.in/cdn/shop/products/GB10AntBrown-1.jpg?v=1669027446",
           "like": false,
-          "store": "Beta Boutique",
+          "store": "Boutique Beta",
           "searched": "500 Search today",
           "status": "Normal",
           "colors": [
-            "Black",
+            "Negro",
             "Brown",
-            "Green"
+            "Verde"
           ],
           "location": [
             "Amsterdam"
@@ -195,13 +195,13 @@
           "price": 59.99,
           "image": "https://media.centrepointstores.com/i/centrepoint/5015316-HQ150618-SPWIN24270224_01-2100.jpg?fmt=auto&",
           "like": false,
-          "store": "Gamma Goods",
+          "store": "Artículos Gamma",
           "searched": "650 Search today",
           "status": "Normal",
           "colors": [
-            "Blue",
-            "Green",
-            "Red"
+            "Azul",
+            "Verde",
+            "Rojo"
           ],
           "location": [
             "San Diego",
@@ -212,8 +212,8 @@
       ]
     },
     {
-      "name": "Bags",
-      "subtitle": "215 Products",
+      "name": "Bolsos",
+      "subtitle": "215 productos",
       "image": "https://www.shutterstock.com/image-photo/backpack-different-colorful-stationery-on-600nw-1710645322.jpg",
       "position": "left",
       "products": [
@@ -223,15 +223,15 @@
           "price": 79.95,
           "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS5vKiItM4pWBpau6a6xyI4y0iJ2xWfDQ8glDiWPDO8FUCxrBicp8GxGVjjThw01yzF3_4&usqp=CAU",
           "like": false,
-          "store": "Delta Deals",
+          "store": "Ofertas Delta",
           "searched": "900 Search today",
           "status": "Hot",
           "colors": [
-            "Black",
-            "Green",
-            "Blue",
-            "LightBlue",
-            "Red"
+            "Negro",
+            "Verde",
+            "Azul",
+            "Celeste",
+            "Rojo"
           ],
           "location": [
             "San Diego"
@@ -240,16 +240,16 @@
         {
           "name": "Bolso Tote de Cuero",
           "description": "Bolso tote de piel suave, ideal para diario.",
-          "price": 120.00,
+          "price": 120,
           "image": "https://i.pinimg.com/474x/4e/25/6b/4e256b6e2b3c7a381c5c6526b319bf9f.jpg",
           "like": true,
-          "store": "Epsilon Emporium",
+          "store": "Emporio Épsilon",
           "searched": "550 Search today",
           "status": "Normal",
           "colors": [
-            "Black",
-            "Red",
-            "Blue"
+            "Negro",
+            "Rojo",
+            "Azul"
           ],
           "location": [
             "New York",
@@ -263,15 +263,15 @@
           "price": 49.99,
           "image": "https://m-commerce.countryroad.com/productimages_display/TRMEDIUM/1/121637_568518_378212.jpg",
           "like": false,
-          "store": "Alpha Store",
+          "store": "Tienda Alfa",
           "searched": "700 Search today",
           "status": "Normal",
           "colors": [
-            "LightBlue",
-            "Blue",
-            "Green",
-            "Red",
-            "Black"
+            "Celeste",
+            "Azul",
+            "Verde",
+            "Rojo",
+            "Negro"
           ],
           "location": [
             "Amsterdam"
@@ -283,13 +283,13 @@
           "price": 99.99,
           "image": "https://m-commerce.mimco-accessories.com/productimages_display/zoom/2/24125_39994_88982.jpg",
           "like": false,
-          "store": "Beta Boutique",
+          "store": "Boutique Beta",
           "searched": "620 Search today",
           "status": "Normal",
           "colors": [
-            "Black",
-            "Blue",
-            "LightBlue"
+            "Negro",
+            "Azul",
+            "Celeste"
           ],
           "location": [
             "New York"
@@ -298,24 +298,24 @@
       ]
     },
     {
-      "name": "Shoes",
-      "subtitle": "97 Products",
+      "name": "Calzado",
+      "subtitle": "97 productos",
       "image": "https://img.freepik.com/premium-photo/pair-yellow-sneakers-flower-buds-yellow-background-spring-summer-fashion-concept_1048944-19842213.jpg?semt=ais_hybrid&w=740",
       "position": "right",
       "products": [
         {
           "name": "Zapatillas para Correr",
           "description": "Zapatillas ligeras con amortiguación Gel.",
-          "price": 110.00,
+          "price": 110,
           "image": "https://www.nike.sa/dw/image/v2/BDVB_PRD/on/demandware.static/-/Sites-akeneo-master-catalog/default/dw9d092259/nk/556/8/5/c/4/a/55685c4a_d8d3_4140_a0ca_27df2220a9e3.jpg?sw=700&sh=700&sm=fit&q=100&strip=false",
           "like": false,
-          "store": "Gamma Goods",
+          "store": "Artículos Gamma",
           "searched": "1.1k Search today",
           "status": "New",
           "colors": [
-            "Black",
-            "Green",
-            "Red"
+            "Negro",
+            "Verde",
+            "Rojo"
           ],
           "location": [
             "San Diego"
@@ -327,14 +327,14 @@
           "price": 139.99,
           "image": "https://assets.ajio.com/medias/sys_master/root/20230421/Gzob/64428607711cf97ba73d2bb0/-473Wx593H-466083260-tan-MODEL8.jpg",
           "like": false,
-          "store": "Delta Deals",
+          "store": "Ofertas Delta",
           "searched": "800 Search today",
           "status": "Popular",
           "colors": [
-            "Black",
-            "Blue",
-            "LightBlue",
-            "Green"
+            "Negro",
+            "Azul",
+            "Celeste",
+            "Verde"
           ],
           "location": [
             "New York",
@@ -345,18 +345,18 @@
         {
           "name": "Mocasines sin Cordones",
           "description": "Mocasines cómodos para uso casual.",
-          "price": 69.50,
+          "price": 69.5,
           "image": "https://i.ebayimg.com/images/g/2a4AAOSwGYZmciIn/s-l1200.jpg",
           "like": false,
-          "store": "Epsilon Emporium",
+          "store": "Emporio Épsilon",
           "searched": "550 Search today",
           "status": "Normal",
           "colors": [
-            "Blue",
-            "LightBlue",
-            "Red",
-            "Green",
-            "Black"
+            "Azul",
+            "Celeste",
+            "Rojo",
+            "Verde",
+            "Negro"
           ],
           "location": [
             "Amsterdam"
@@ -368,13 +368,13 @@
           "price": 49.99,
           "image": "https://images-cdn.ubuy.co.in/633af87aeba0d54e2d4d4787-women-shoes-sneakers-girls-canvas-shoes.jpg",
           "like": false,
-          "store": "Alpha Store",
+          "store": "Tienda Alfa",
           "searched": "700 Search today",
           "status": "Normal",
           "colors": [
-            "Red",
-            "Black",
-            "LightBlue"
+            "Rojo",
+            "Negro",
+            "Celeste"
           ],
           "location": [
             "New York"
@@ -383,8 +383,8 @@
       ]
     },
     {
-      "name": "Electronics",
-      "subtitle": "341 Products",
+      "name": "Electrónica",
+      "subtitle": "341 productos",
       "image": "https://images.unsplash.com/photo-1498049794561-7780e7231661?w=1500",
       "position": "left",
       "products": [
@@ -394,13 +394,13 @@
           "price": 59.99,
           "image": "https://www.dimprice.co.uk/image/cache/catalog/products_2022/1-1-800x800.jpg",
           "like": false,
-          "store": "Beta Boutique",
+          "store": "Boutique Beta",
           "searched": "1.0k Search today",
           "status": "Hot",
           "colors": [
-            "Black",
-            "Green",
-            "Blue"
+            "Negro",
+            "Verde",
+            "Azul"
           ],
           "location": [
             "San Diego"
@@ -412,15 +412,15 @@
           "price": 129.99,
           "image": "https://cdn.panacompu.com/cdn-img/pv/sd-1.jpg",
           "like": false,
-          "store": "Gamma Goods",
+          "store": "Artículos Gamma",
           "searched": "850 Search today",
           "status": "Hot",
           "colors": [
-            "Black",
-            "Red",
-            "LightBlue",
-            "Green",
-            "Blue"
+            "Negro",
+            "Rojo",
+            "Celeste",
+            "Verde",
+            "Azul"
           ],
           "location": [
             "New York",
@@ -434,13 +434,13 @@
           "price": 39.99,
           "image": "https://thotcomputacion.com.uy/wp-content/uploads/2023/05/Logitech2520PRO2520Gaming_175332_146b72173b84431fa325b0734554df7b.webp",
           "like": true,
-          "store": "Delta Deals",
+          "store": "Ofertas Delta",
           "searched": "650 Search today",
           "status": "Normal",
           "colors": [
-            "Black",
-            "Blue",
-            "LightBlue"
+            "Negro",
+            "Azul",
+            "Celeste"
           ],
           "location": [
             "Amsterdam"
@@ -452,15 +452,15 @@
           "price": 89.99,
           "image": "https://techspertz.co.za/wp-content/uploads/2021/12/T-TGK306_wr_06.jpg",
           "like": false,
-          "store": "Epsilon Emporium",
+          "store": "Emporio Épsilon",
           "searched": "780 Search today",
           "status": "Normal",
           "colors": [
-            "Black",
-            "Green",
-            "Red",
-            "Blue",
-            "LightBlue"
+            "Negro",
+            "Verde",
+            "Rojo",
+            "Azul",
+            "Celeste"
           ],
           "location": [
             "New York"

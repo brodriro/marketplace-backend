@@ -3,19 +3,25 @@ import type { OrderStatus, ProductStatus } from "@/lib/types";
 
 const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   pending_payment: "Pago pendiente",
-  processing: "Procesando",
+  paid: "Pagado",
+  preparing: "Preparando",
   shipped: "Enviado",
   delivered: "Entregado",
+  cancelled: "Cancelado",
+  refunded: "Reembolsado",
 };
 
 const ORDER_STATUS_VARIANT: Record<
   OrderStatus,
-  "outline" | "secondary" | "default"
+  "outline" | "secondary" | "default" | "destructive"
 > = {
   pending_payment: "outline",
-  processing: "secondary",
+  paid: "secondary",
+  preparing: "secondary",
   shipped: "secondary",
   delivered: "default",
+  cancelled: "destructive",
+  refunded: "destructive",
 };
 
 export function OrderStatusBadge({ status }: { status: OrderStatus }) {

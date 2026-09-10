@@ -3,10 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Activity,
+  BarChart3,
+  Bot,
   LayoutDashboard,
   LogOut,
   Package,
   Image as ImageIcon,
+  ScrollText,
   ShoppingCart,
   Tags,
   Users,
@@ -15,11 +19,15 @@ import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/", label: "Resumen", icon: LayoutDashboard },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/products", label: "Productos", icon: Package },
   { href: "/categories", label: "Categorías", icon: Tags },
   { href: "/banners", label: "Banners", icon: ImageIcon },
   { href: "/orders", label: "Pedidos", icon: ShoppingCart },
   { href: "/users", label: "Usuarios", icon: Users },
+  { href: "/monitor", label: "Monitor", icon: Activity },
+  { href: "/audit-logs", label: "Auditoría", icon: ScrollText },
+  { href: "/agent-config", label: "Agente", icon: Bot },
 ];
 
 export function NavSidebar({ onLogout }: { onLogout: () => void }) {

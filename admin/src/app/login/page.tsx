@@ -14,7 +14,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError, api } from "@/lib/api-client";
-import { decodeJwtPayload, setTokens } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,13 +25,8 @@ export default function LoginPage() {
     event.preventDefault();
     setLoading(true);
     try {
-      const tokens = await api.login(email, password);
-      const decoded = decodeJwtPayload(tokens.accessToken);
-      if (!decoded || decoded.role !== "admin") {
-        toast.error("Esta cuenta no tiene permisos de administrador");
-        return;
-      }
-      setTokens(tokens);
+      // El backend valida rol admin y setea las cookies httpOnly de sesión + CSRF.
+      await api.login(email, password);
       router.replace("/");
     } catch (error) {
       const message =
