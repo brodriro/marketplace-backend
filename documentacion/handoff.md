@@ -8,6 +8,35 @@
 
 ---
 
+## 2026-09-10 · Plan E2E · CIERRE DEL HILO — sin deploy de prod, todo localhost
+
+- **Qué:** el hilo E2E cross-repo (M0→M8, "loop completo app + admin") se da por **cerrado**.
+  Decisión del usuario del 2026-09-10 tras el ensayo del loop: **no hay deploy de prod, todo corre
+  en localhost.** El cutover a `api.brodriro.dev` (M8/B8) queda **descartado** — el dominio ni
+  siquiera resuelve; no hubo corrida `e2e-M8-20260910-02`.
+- **Estado final del código:** `origin/master @ 0213307`. PR #10 (`feat/e2e-m8-v1-cutover`) = cutover
+  a `/v1` puro + remoción del alias `VERSION_NEUTRAL` (rutas sin `/v1` → 404; el webhook del
+  proveedor conserva su ruta propia). PR #9 (`chore/docs-handoff-restructure`) = docs. Los dos ya
+  mergeados; sus ramas remote fueron borradas.
+- **Entregable final = ensayo `e2e-M8-20260910-01`** (2026-09-10, 3 sesiones, 1 pasada, `:3000` sobre
+  RDS pre-prod, `PAYMENT_PROVIDER` sin setear → `bypass`): **6/6 criterios §4 del loop verdes**
+  (PATCH admin precio/stock → visible en la app · carrito armado desde el chat a precio vivo ·
+  checkout desde el chat → `paid` · ciclo de estados admin + timeline + notificaciones ·
+  `back_in_stock` · search es-419 + búsqueda vacía). Readout en
+  `demoCompose/docs/screenshots/e2e-M8/README`. Detalle en la entrada M8 de abajo.
+- **Runtime que queda:** `:3000` sirviendo `/v1` sobre el RDS pre-prod (13/13 migraciones).
+  `demoCompose/buildTypes.gradle` apunta a `192.168.31.63:3000/v1/`. `@agente` en `:2500`.
+- **Por qué:** el usuario decidió no reintroducir el ciclo de build/deploy de prod para este
+  ejercicio; el loop quedó demostrado end-to-end contra localhost + RDS pre-prod, que es suficiente.
+- **Archivos clave:** este `handoff.md` + `tasks.md` (hilo marcado cerrado, "blocked" vaciado).
+- **Follow-ups (no bloqueantes, hacer solo si el usuario lo pide):**
+  `@nestjs/swagger` + `GET /docs` + `pnpm run openapi:dump` (hoy `openapi.json` es el esqueleto de
+  M0) · `discountCode` en `POST /orders` se hashea pero no se aplica al `total` · search
+  `"remera negra"` (fem.) necesita stemming · wording de la sección Payments de `CLAUDE.md` sobre
+  `OrderStatusHistory.meta` + `e2eRunId` impreciso para el path admin (las transiciones admin
+  estampan `e2eRunId` solo en `AuditLog`, no en el history; solo el tramo system lo pone en el
+  history) · ramas remote zombie a borrar: `feat/e2e-m3-admin`, `feat/catalog-promo-sku-es-names`.
+
 ## 2026-09-10 · Plan E2E · M8 — cutover `/v1` + ensayo del loop completo (rama `feat/e2e-m8-v1-cutover`)
 
 - **`feat/e2e-m8-v1-cutover @ 3309fb6`** (de `origin/master ef97de5`), pusheada, **sin merge** (PR lo

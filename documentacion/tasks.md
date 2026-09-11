@@ -5,24 +5,20 @@
 
 ## Retomar acá
 
-**Plan E2E cross-repo — M0→M8 COMPLETOS (código).** Estado al 2026-09-10:
+**Plan E2E cross-repo — HILO CERRADO 2026-09-10.**
 
-- **En `master` (`ef97de5`):** M0..M4 (PRs #2/#3/#4), M6/B7 search por tokens (PR #4),
-  M5 pago provider-agnostic con `bypass` por defecto (PR #7), M6/B7 datos i18n es-419 + M7/B6
-  admin polish + sesión admin cookie httpOnly/CSRF (PR #8).
-- **Pusheadas, sin merge — el PR lo abre el usuario:**
-  - `feat/e2e-m8-v1-cutover @ 3309fb6` — M8 · remoción del alias `VERSION_NEUTRAL`; la API vive
-    solo bajo `/v1` (rutas sin prefijo → 404; el webhook del proveedor conserva su ruta propia).
-  - `chore/docs-handoff-restructure @ 31ede3a` — convención de compresión de `handoff.md`
-    (10 completas + 1 línea) + entrada M8 + este `tasks.md`/`plan.md`.
-- **Migraciones RDS pre-prod al día (13/13, verificadas):** `_add_audit_log`,
-  `_add_audit_log_meta`, `_add_order_lifecycle_and_notifications`, `20260908180000`
-  (payments / `IdempotencyKey` / `Order.paymentIntentId` / `OrderStatusHistory.meta`),
-  `20260909180000_i18n_es419_catalog`.
-- **Ensayo del loop `e2e-M8-20260910-01` (2026-09-10):** 6/6 criterios §4 verdes (app-side por
-  demoCompose, server-side acá; readout en `demoCompose/docs/screenshots/e2e-M8/README`).
+M0→M8 code-complete en `origin/master @ 0213307` (PR #10 = cutover a `/v1` puro + remoción del alias
+`VERSION_NEUTRAL`; PR #9 = docs). 13/13 migraciones en el **RDS pre-prod** (verificadas).
+`PAYMENT_PROVIDER` default `bypass` (pago provider-agnostic desde M5 — NO Stripe obligatorio).
 
-**Falta (todo del usuario / post-merge):** ver "blocked" y "todo".
+- **Entregable final:** ensayo `e2e-M8-20260910-01` (2026-09-10, 3 sesiones, 1 pasada) — **6/6
+  criterios §4 del loop verdes** (app-side por demoCompose, server-side acá; readout en
+  `demoCompose/docs/screenshots/e2e-M8/README`).
+- **Decisión del usuario (2026-09-10): NO hay deploy de prod. Todo corre en localhost.** El cutover a
+  `api.brodriro.dev` queda **descartado** — el dominio ni siquiera resuelve. NO hubo corrida
+  `e2e-M8-20260910-02`. `:3000` sirve `/v1` sobre el RDS pre-prod; `demoCompose/buildTypes.gradle`
+  se queda en `192.168.31.63:3000/v1/`.
+- **No queda nada activo del hilo E2E.** Los follow-ups que sobreviven son no bloqueantes — ver "todo".
 
 ## doing
 
@@ -52,27 +48,24 @@
   `/admin/monitor/{notifications,stock-alerts}`, `/admin/agent-config`; páginas Next.js. Sesión
   admin **dual-mode**: Bearer + cookie httpOnly + CSRF double-submit (`AdminCsrfGuard` `APP_GUARD`).
   _Follow-up_: test runtime del login por cookie del panel contra un backend levantado.
-- **M8 · B8 + deploy.** ⏳ Parcial.
-  - ✅ Cutover `/v1` (remoción de `VERSION_NEUTRAL`) — `feat/e2e-m8-v1-cutover @ 3309fb6`, sin merge.
-  - ✅ Ensayo E2E del loop completo — `e2e-M8-20260910-01`, 6/6 §4.
-  - ⏳ `@nestjs/swagger` → `GET /docs` + `pnpm run openapi:dump` — **no hecho** (ver "todo").
-  - ⏳ Redeploy `api.brodriro.dev` + migraciones en orden — **no hecho** (ver "blocked").
+- **M8 · B8 + deploy.** ✅ Cerrado 2026-09-10 (parcial — deploy de prod descartado por el usuario).
+  - ✅ Cutover `/v1` (remoción de `VERSION_NEUTRAL`) — `origin/master @ 0213307` (PR #10).
+  - ✅ Ensayo E2E del loop completo — `e2e-M8-20260910-01`, 6/6 §4. **Entregable final del hilo.**
+  - ⏳ `@nestjs/swagger` → `GET /docs` + `pnpm run openapi:dump` — no hecho, **follow-up no
+    bloqueante** (ver "todo").
+  - ❌ Redeploy `api.brodriro.dev` — **descartado**: sin deploy de prod, todo localhost.
 
 ## blocked
 
-- **Redeploy de `api.brodriro.dev` desde el `master` actual.** El merge a `master` de M0..M7 ya
-  está; el RDS ya tiene todas las migraciones (13/13). Bloquea: endpoint `GET /promo-codes/:code`
-  + SKU opcional del panel + todo M1..M7 **en prod**, y la re-verificación del loop post-redeploy.
-  Espera: OK del usuario / acceso al deploy. Tras el redeploy: cutover de `MARKETPLACE_BASE_URL`
-  (lo coordina demoCompose / `@agente`).
+- _(nada — el redeploy de `api.brodriro.dev` lo descartó el usuario el 2026-09-10; sin deploy de
+  prod, todo localhost. El cutover de `MARKETPLACE_BASE_URL` que dependía de esto queda sin efecto.)_
 
 ## todo
 
-- **M8 · `@nestjs/swagger` + `openapi:dump`.** Agregar `@nestjs/swagger`, exponer `GET /docs`,
-  script `pnpm run openapi:dump` que regenere `documentacion/openapi.json` desde los decoradores
-  (hoy `openapi.json` es el esqueleto de M0, refleja el contrato pero no se genera del código).
-- **Merge a `master` de `feat/e2e-m8-v1-cutover` + `chore/docs-handoff-restructure`.** Lo abre/
-  mergea el usuario (sin `gh` CLI acá; no se mergea a master desde background).
+- **M8 · `@nestjs/swagger` + `openapi:dump`** (follow-up no bloqueante). Agregar `@nestjs/swagger`,
+  exponer `GET /docs`, script `pnpm run openapi:dump` que regenere `documentacion/openapi.json` desde
+  los decoradores (hoy `openapi.json` es el esqueleto de M0, refleja el contrato pero no se genera
+  del código). Hacer solo si el usuario lo pide.
 - **Borrar ramas remote zombie:** `feat/e2e-m3-admin`, `feat/catalog-promo-sku-es-names`
   (`git push origin --delete …` — acción del usuario, el classifier lo bloquea acá).
 - **Job de limpieza de usuarios throwaway (opción B).** `agent+<contextId>@agent.brodriro.dev`
