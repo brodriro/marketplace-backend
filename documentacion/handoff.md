@@ -8,12 +8,66 @@
 
 ---
 
+## 2026-09-10 · Plan E2E · limpieza de ramas/worktrees zombie (post-corrida `-02`)
+
+- **Qué:** sync de `master` local (estaba 21 commits atrás de `origin/master`, colgado en
+  `feat/e2e-m3-admin` desde antes del cierre) + housekeeping de git. Se verificó por ancestría
+  (`git merge-base --is-ancestor`) que `feat/e2e-m3-admin`, `chore/docs-handoff-restructure`,
+  `chore/docs-sync`, `feat/e2e-m5-payments`, `feat/e2e-m8-v1-cutover` y `feat/catalog-promo-sku-es-names`
+  ya eran ancestros de `origin/master` (mergeadas vía PR) → se borraron las 6 ramas locales +
+  las 2 remote que quedaban, y se removieron los worktrees zombie `docs-sync` y `e2e-m5-payments`
+  (ambos limpios, sin cambios sin commitear).
+- **Por qué:** pedido explícito del usuario tras cerrar el hilo — dejar el repo con una sola rama
+  viva además de `master`.
+- **Qué queda:** worktree `e2e-m7-admin` (rama `docs/e2e-cierre-2026-09-10`, == `origin/master`)
+  sin tocar — sirvió `:3000` para la corrida `-02` de abajo y tenía en ese momento los cambios sin
+  commitear que se convirtieron en `0b0b0e2` (esta misma serie de entradas).
+- **Archivos clave:** ninguno de código — solo refs de git.
+
+## 2026-09-10 · Plan E2E · corrida adicional `e2e-M8-20260910-02` (post-cierre) — 6/6
+
+- **Qué:** pese a la entrada de cierre de abajo (que se escribió/pusheó en paralelo, ver su nota de
+  corrección), el usuario pidió una segunda pasada coordinada del loop completo el mismo día — 3
+  sesiones (`@backend` / `@app` / `@agente`), mismo mecanismo que `-01` pero sin resetear datos
+  (stock/precio ya tocados por `-01`, alertas ya `notified`). **6/6 criterios §4 verdes:**
+  - **#1** PATCH admin "Bolso Bandolera" (`bc505132…`): `price 44.99→39.99` + variante Azul
+    (`d49492e7…`) `stock 28→35`. 2 `AuditLog` con `meta.e2eRunId`.
+  - **#2** carrito desde el chat quedó en 4× Bolso Bandolera Azul (no los 2 pedidos) — **hallazgo
+    de `@agente`, no de este repo:** retry no-idempotente en `manage_cart` (reintento reenvió el
+    turno en vez de reusar la key).
+  - **#3** checkout → `POST /v1/orders 201` (`5604c85c…`, total `159.96` = 4×`39.99`) →
+    `.../confirm 200` → `paid`. `order_status_history` fila `paid/system` con `meta.e2eRunId`. El
+    retry del turno de pago reusó el mismo `taskId` (resubscribe SSE, no ejercitó `Idempotency-Key`
+    real) pero aun así no duplicó la orden (demo 11→12).
+  - **#4** PATCH admin `5604c85c…` `paid→preparing→shipped` (+ `TRK-M8-911`/`OCA`). Timeline 4
+    estados; 3 `Notification order_status_changed`; 2 `AuditLog` con `meta.e2eRunId` (history de los
+    tramos admin queda `meta:null`, igual comportamiento que en `-01`).
+  - **#5** ciclo stock Verde (`crossbody-bag-green`, `8d5e94be…`) `15→0→20`, con una `StockAlert`
+    nueva (las 2 de seed/‑01 ya estaban `notified:true`) → `Notification back_in_stock` con
+    deep-link a producto, alerta pasa a `notified=true`.
+  - **#6** search es-419 + `TurnMeta` — cerrado app+agente, sin verificación server-side acá.
+- **Runtime:** mismo `:3000` de la corrida `-01` (sin reiniciar), `origin/master @ 0213307`, RDS
+  pre-prod (13/13 migraciones). Mutaciones admin ejecutadas vía API (Bearer admin + `X-E2E-Run`); el
+  clasificador de permisos de la sesión de backend pidió aprobación explícita del usuario 3 veces
+  (una por cada tanda de PATCH admin).
+- **Por qué:** validar que el mecanismo del loop (no solo la primera corrida) sobrevive con datos ya
+  modificados — nada estaba "fresco".
+- **Archivos clave:** ninguno de código — solo API calls + este handoff. Evidencia app-side y
+  capturas (16, `docs/screenshots/e2e-M8-02/`) en `demoCompose/docs/plan-e2e.md` §7.4 (rama
+  `worktree-e2e-m8-run02-docs`, mergeada a `master` por `@app`, `9c797cf`).
+- **Follow-ups:** idempotencia real de `manage_cart`/reintento de turno en `@agente` (no es de este
+  repo) · resto de follow-ups sigue en la entrada de cierre de abajo.
+
 ## 2026-09-10 · Plan E2E · CIERRE DEL HILO — sin deploy de prod, todo localhost
 
-- **Qué:** el hilo E2E cross-repo (M0→M8, "loop completo app + admin") se da por **cerrado**.
-  Decisión del usuario del 2026-09-10 tras el ensayo del loop: **no hay deploy de prod, todo corre
-  en localhost.** El cutover a `api.brodriro.dev` (M8/B8) queda **descartado** — el dominio ni
-  siquiera resuelve; no hubo corrida `e2e-M8-20260910-02`.
+- **Corrección (misma noche, ver entradas arriba):** esta entrada se escribió/pusheó en paralelo a
+  una segunda corrida coordinada que el usuario sí pidió — `e2e-M8-20260910-02`, 6/6 criterios
+  verdes. El cierre de abajo es sobre **código/deploy** (no se reabre el hilo de desarrollo, no hay
+  plan de prod), no sobre el loop de validación — una corrida adicional de smoke-test no lo contradice.
+- **Qué:** el hilo E2E cross-repo (M0→M8, "loop completo app + admin") se da por **cerrado** en
+  cuanto a alcance de código/deploy. Decisión del usuario del 2026-09-10 tras el ensayo del loop:
+  **no hay deploy de prod, todo corre en localhost.** El cutover a `api.brodriro.dev` (M8/B8) queda
+  **descartado** — el dominio ni siquiera resuelve.
 - **Estado final del código:** `origin/master @ 0213307`. PR #10 (`feat/e2e-m8-v1-cutover`) = cutover
   a `/v1` puro + remoción del alias `VERSION_NEUTRAL` (rutas sin `/v1` → 404; el webhook del
   proveedor conserva su ruta propia). PR #9 (`chore/docs-handoff-restructure`) = docs. Los dos ya
@@ -35,7 +89,8 @@
   `"remera negra"` (fem.) necesita stemming · wording de la sección Payments de `CLAUDE.md` sobre
   `OrderStatusHistory.meta` + `e2eRunId` impreciso para el path admin (las transiciones admin
   estampan `e2eRunId` solo en `AuditLog`, no en el history; solo el tramo system lo pone en el
-  history) · ramas remote zombie a borrar: `feat/e2e-m3-admin`, `feat/catalog-promo-sku-es-names`.
+  history) · ~~ramas remote zombie a borrar: `feat/e2e-m3-admin`, `feat/catalog-promo-sku-es-names`~~
+  hecho (ver entrada de limpieza arriba).
 
 ## 2026-09-10 · Plan E2E · M8 — cutover `/v1` + ensayo del loop completo (rama `feat/e2e-m8-v1-cutover`)
 

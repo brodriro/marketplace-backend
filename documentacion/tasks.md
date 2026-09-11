@@ -11,13 +11,19 @@ M0→M8 code-complete en `origin/master @ 0213307` (PR #10 = cutover a `/v1` pur
 `VERSION_NEUTRAL`; PR #9 = docs). 13/13 migraciones en el **RDS pre-prod** (verificadas).
 `PAYMENT_PROVIDER` default `bypass` (pago provider-agnostic desde M5 — NO Stripe obligatorio).
 
-- **Entregable final:** ensayo `e2e-M8-20260910-01` (2026-09-10, 3 sesiones, 1 pasada) — **6/6
-  criterios §4 del loop verdes** (app-side por demoCompose, server-side acá; readout en
-  `demoCompose/docs/screenshots/e2e-M8/README`).
+- **Entregables:** ensayo `e2e-M8-20260910-01` (2026-09-10, 3 sesiones, 1 pasada) **y** una corrida
+  adicional `e2e-M8-20260910-02` pedida por el usuario esa misma noche (post-cierre, sin resetear
+  datos) — **ambas 6/6 criterios §4 del loop verdes** (app-side por demoCompose, server-side acá).
+  Readout `-01`: `demoCompose/docs/screenshots/e2e-M8/README`. Readout `-02`: detalle en
+  `handoff.md` + `demoCompose/docs/plan-e2e.md` §7.4 + `docs/screenshots/e2e-M8-02/`.
 - **Decisión del usuario (2026-09-10): NO hay deploy de prod. Todo corre en localhost.** El cutover a
-  `api.brodriro.dev` queda **descartado** — el dominio ni siquiera resuelve. NO hubo corrida
-  `e2e-M8-20260910-02`. `:3000` sirve `/v1` sobre el RDS pre-prod; `demoCompose/buildTypes.gradle`
-  se queda en `192.168.31.63:3000/v1/`.
+  `api.brodriro.dev` queda **descartado** — el dominio ni siquiera resuelve. `:3000` sirve `/v1`
+  sobre el RDS pre-prod; `demoCompose/buildTypes.gradle` se queda en `192.168.31.63:3000/v1/`. Esto
+  es sobre código/deploy — no impidió la corrida `-02` (smoke-test adicional, no reabre el hilo).
+- **Repo limpio post-corridas:** `master` local sincronizado con `origin/master`; ramas y worktrees
+  zombie (`feat/e2e-m3-admin`, `chore/docs-handoff-restructure`, `chore/docs-sync`,
+  `feat/e2e-m5-payments`, `feat/e2e-m8-v1-cutover`, `feat/catalog-promo-sku-es-names`) borrados —
+  todas eran ancestros de `origin/master`, ya mergeadas vía PR.
 - **No queda nada activo del hilo E2E.** Los follow-ups que sobreviven son no bloqueantes — ver "todo".
 
 ## doing
