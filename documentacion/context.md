@@ -37,7 +37,7 @@ Commits, comentarios de código y docs en **español**.
 | `demoCompose` (`mobile`, Android) | Shape de la API que consume la grilla / detalle / carrito / favoritos / pedidos | **`documentacion/API.md` de este repo** (se genera del código) |
 | `demoCompose` (`mobile`) | Catálogo A2UI / `catalog.schema.json` (componentes `ProductItem`, `VariantSelector`, …) | **`demoCompose`** |
 | `demoCompose` + `agente-mobile` | Formato de `ProductVariant.sku` (`<slug(producto)>-<slug(color)>`, opaco/estable) | **`src/products/sku.util.ts` de este repo** — no cambiar el formato sin coordinar |
-| `agente-mobile` (agente A2A) | Auth opción B (usuario efímero por sesión), carrito in-memory en el agente, `GET /promo-codes/:code` de solo validación | **`documentacion/reference/handoff-integracion-agente.md`** de este repo |
+| `agente-mobile` (agente A2A) | Bearer real del usuario (propagado, sin cuenta efímera — reemplazó la opción B en M1/A4), `/cart` server-side (reemplazó el in-memory del agente en M2), `GET /promo-codes/:code` de solo validación | **`documentacion/plan.md`** (decisiones) + **`documentacion/reference/handoff-integracion-agente.md`** de este repo (histórico pre-M1/M2, con nota de corrección al tope) |
 
 El plan de diseño global (diagnóstico, modelo de datos, justificación de stack) es
 `docs/plan-marketplace-backend.md` en `demoCompose`, no acá.

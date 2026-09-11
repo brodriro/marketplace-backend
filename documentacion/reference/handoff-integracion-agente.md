@@ -3,6 +3,18 @@
 > Estado al 2026-08-27. Coordinación hecha entre esta sesión y la sesión Claude del repo
 > `agente-mobile` (repo del agente conversacional A2A). Este doc es para retomar mañana.
 
+> ⚠️ **Superado por el plan E2E (2026-09-06→10), ver `plan.md` § "Decisiones de diseño abiertas".**
+> La tabla "Decisiones tomadas" de abajo describe el contrato de **antes** del plan E2E — se
+> mantiene como registro histórico, no como estado actual:
+> - **Auth del agente:** la opción B (usuario efímero `agent+<contextId>@…`) se **eliminó** en
+>   M1/A4 — el agente ahora propaga el bearer real del usuario (login normal). Sigue pendiente solo
+>   un cleanup one-shot de los `agent+*` ya creados (`tasks.md`, sin dueño).
+> - **Carrito:** dejó de ser in-memory en el agente — es **persistido server-side** (`Cart`/
+>   `CartItem`, M2), fuente de verdad única para app y agente; el agente lo consume vía proxy con el
+>   bearer real. `GET/POST/PATCH/DELETE /cart*`.
+> - El resto de las correcciones de mock (`POST /orders` body, `Decimal` como string, favorites,
+>   etc.) sigue vigente.
+
 ## Contexto
 
 El `agente-mobile` deja de usar repos mock y pasa a leer/escribir todo contra este backend real

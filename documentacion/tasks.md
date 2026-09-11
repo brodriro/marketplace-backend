@@ -72,12 +72,9 @@ M0→M8 code-complete en `origin/master @ 0213307` (PR #10 = cutover a `/v1` pur
   exponer `GET /docs`, script `pnpm run openapi:dump` que regenere `documentacion/openapi.json` desde
   los decoradores (hoy `openapi.json` es el esqueleto de M0, refleja el contrato pero no se genera
   del código). Hacer solo si el usuario lo pide.
-- **Borrar ramas remote zombie:** `feat/e2e-m3-admin`, `feat/catalog-promo-sku-es-names`
-  (`git push origin --delete …` — acción del usuario, el classifier lo bloquea acá).
 - **Job de limpieza de usuarios throwaway (opción B).** `agent+<contextId>@agent.brodriro.dev`
-  por sesión A2A; nada los borra. Sin dueño.
-- **Merge coordinado de `chore/docs-restructure`** en los 3 repos (agente-mobile y demoCompose ya
-  lo tienen en rama). Sin merge unilateral.
+  por sesión A2A, de antes de M1/A4 (ver corrección en `reference/handoff-integracion-agente.md`);
+  nada los borra. Sin dueño.
 
 ## Notas
 

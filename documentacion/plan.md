@@ -9,16 +9,18 @@ El backend ya cubre el flujo completo que consume la app Android (catálogo, bú
 reviews, pedidos, alertas de stock) y la integración con el agente conversacional A2A
 (`agente-mobile`).
 
-**Foco actual: plan E2E cross-repo** ("loop completo app + dashboard admin", coordinado con
+**Plan E2E cross-repo — CERRADO 2026-09-10** ("loop completo app + dashboard admin", coordinado con
 `demoCompose` y `agente-mobile`; canónico en `demoCompose/docs/plan-e2e.md`). `@backend` llevó el
 grueso: auth con roles + refresh, carrito persistido, ciclo de vida del pedido con historial y
-eventos, pago provider-agnostic, extender el admin, OpenAPI + `/v1`. **M0→M8 completos en código**
-(2026-09-10); ensayo del loop `e2e-M8-20260910-01` 6/6 §4 verde. Lane detallada en
-[`tasks.md`](tasks.md).
+eventos, pago provider-agnostic, extender el admin, OpenAPI + `/v1`. **M0→M8 completos y mergeados**
+en `origin/master` — no queda nada de esta lane en rama. Dos corridas del loop, ambas **6/6 §4
+verdes**: `e2e-M8-20260910-01` y una adicional `e2e-M8-20260910-02` pedida esa misma noche. Detalle
+en `handoff.md`, lane completa en [`tasks.md`](tasks.md).
 
-Queda **consolidar / desplegar**: mergear `feat/e2e-m8-v1-cutover` + `chore/docs-handoff-restructure`
-(usuario), `@nestjs/swagger` + `openapi:dump` (cola de M8), y el redeploy de `api.brodriro.dev`
-desde `master` + cutover de `MARKETPLACE_BASE_URL`.
+**Cierre es de código/deploy, no del loop de validación:** el usuario decidió **no** desplegar a
+prod (`api.brodriro.dev` descartado — el dominio ni resuelve); todo corre en localhost/RDS
+pre-prod. Repo consolidado en una sola rama (`master`) — ramas y worktrees zombie ya borrados.
+Único follow-up no bloqueante de esta lane: `@nestjs/swagger` + `openapi:dump` (ver `tasks.md`).
 
 ## Hitos
 
@@ -26,22 +28,21 @@ desde `master` + cutover de `MARKETPLACE_BASE_URL`.
   orders, notifications) — en `master`.
 - ✅ Panel admin (sub-app `admin/`) con CRUD de productos y categorías.
 - ✅ Promo codes (`GET /promo-codes/:code`), autogeneración de SKU en el panel, nombres de
-  producto en español — **ya en `master`** (`3ab22f4`…`f06fae4`, pusheado a `origin/master`) y
-  **migraciones aplicadas al RDS**, validado en la prueba conjunta. Falta confirmar el **redeploy
-  de `api.brodriro.dev`** desde el `master` actual (el 2026-08-27 el deployado corría código previo).
-- ✅ Reestructura de docs (este layout de 4 archivos) — rama `chore/docs-restructure`, sin merge;
-  el merge de los 3 repos se coordina junto.
+  producto en español — **en `master`**, migraciones aplicadas al RDS, validado en la prueba
+  conjunta 2026-08-27.
+- ✅ Reestructura de docs (este layout de 4 archivos) — mergeada a `master` (PR #1) en los 3 repos.
 - ✅ Plan E2E · M0 (freeze de contrato) — `documentacion/openapi.json` + sección v1 de `API.md`
   (2026-09-06). Contrato en `demoCompose/docs/plan-e2e.md` §6.
-- ✅ Plan E2E · **M1→M7 en `master` (`ef97de5`)** — auth+refresh, carrito persistido, admin+audit,
-  ciclo de vida del pedido con historial + notificaciones + correlación E2E (`X-E2E-Run`), pago
+- ✅ Plan E2E · **M1→M8 en `master`** — auth+refresh, carrito persistido, admin+audit, ciclo de
+  vida del pedido con historial + notificaciones + correlación E2E (`X-E2E-Run`), pago
   provider-agnostic (`bypass` default / `stripe`), search por tokens + i18n es-419 del catálogo,
-  admin polish (analytics/monitor/agent-config) + sesión admin cookie httpOnly/CSRF. Loops E2E M4
-  (`e2e-M4-2026090{8,9}`) y M5 (`e2e-M5-20260909-01`) verdes.
-- 🔷 Plan E2E · **M8** — cutover `/v1` (remoción de `VERSION_NEUTRAL`) en `feat/e2e-m8-v1-cutover`
-  (sin merge); ensayo del loop completo `e2e-M8-20260910-01` **6/6 §4 verde** (2026-09-10). Falta:
-  merge + `@nestjs/swagger`/`openapi:dump` + redeploy.
-- ⏳ Consolidar: merge de las 2 ramas de docs/M8, redeploy `api.brodriro.dev`, `openapi:dump`.
+  admin polish (analytics/monitor/agent-config) + sesión admin cookie httpOnly/CSRF, cutover `/v1`
+  (remoción de `VERSION_NEUTRAL`). Loops E2E M4 (`e2e-M4-2026090{8,9}`), M5 (`e2e-M5-20260909-01`) y
+  el loop completo M8 (`e2e-M8-20260910-01` y `-02`) verdes.
+- ✅ Consolidación post-corridas (2026-09-10/11): repo en una sola rama (`master`), ramas/worktrees
+  zombie borrados, docs corregidos para reflejar la corrida `-02`. Deploy de prod **descartado por
+  el usuario** — ver "Pendiente para producción" y "Servers" más abajo (quedan como registro, no
+  como bloqueo).
 
 ## Decisiones de diseño abiertas
 
@@ -64,7 +65,9 @@ desde `master` + cutover de `MARKETPLACE_BASE_URL`.
 ## Pendiente para producción
 
 Cosas que están OK para dev / el e2e del loop pero **hay que resolver antes de friend & family
-(testeo con usuarios beta) y del despliegue a producción**.
+(testeo con usuarios beta) y del despliegue a producción** — es decir, **no bloqueantes hoy**: el
+usuario decidió el 2026-09-10 no desplegar a prod (ver `handoff.md`), así que esta sección queda
+como referencia para si se retoma, no como trabajo pendiente activo.
 
 - **Proveedor de pago real.** M5/B4 dejó el pago detrás de una interfaz (`PaymentProvider`,
   `src/payments/`) y el proveedor activo por defecto es **`bypass`**: no llama a ningún servicio
@@ -82,7 +85,8 @@ Cosas que están OK para dev / el e2e del loop pero **hay que resolver antes de 
   configurar el webhook (`POST /webhooks/stripe`, firma), y `STRIPE_DEMO_CONFIRM=false` para que
   `POST /orders/:id/confirm` NO acepte confirmaciones sin verificar. El flujo F&F debe correr un
   cobro real de sandbox de punta a punta (Payment Sheet → webhook → `paid`), no el bypass.
-- **Redeploy de `api.brodriro.dev`** — ver "Trenes de deploy" más abajo.
+- **Deploy a `api.brodriro.dev`** — **descartado por el usuario (2026-09-10)**, no solo pendiente:
+  el dominio ni siquiera resuelve hoy. Ver "Servers" más abajo.
 
 ## Coordinación cross-repo
 
@@ -97,12 +101,12 @@ contrato de integración del agente → `reference/handoff-integracion-agente.md
 
 ### Servers
 
-- **`api.brodriro.dev`** — prod. Apunta al **RDS** compartido. El **RDS ya tiene** las
-  migraciones `20260827120000` (promo codes) y `20260827130000` (nombres ES) aplicadas + seed.
-  El código promo/SKU/ES ya está en `master`; **falta confirmar que el proceso deployado se
-  redeployó** desde el `master` actual (el 2026-08-27 corría código previo, sin endpoint promo).
-- **`:3000` local** — usado en las pruebas conjuntas (`node dist/main.js`, apunta al mismo RDS).
-  Los background tasks del harness mueren a los minutos; se corre detached
+- **`api.brodriro.dev`** — prod, **sin uso activo**: el dominio ni siquiera resuelve, y el usuario
+  decidió (2026-09-10) no perseguir el redeploy — todo el loop E2E corrió contra localhost + RDS
+  pre-prod. El **RDS pre-prod** tiene las 13 migraciones aplicadas (M0→M8, verificado
+  `migrate status`), así que si se retoma el redeploy no necesita paso de migración extra.
+- **`:3000` local** — server de las pruebas conjuntas y del loop E2E (`node dist/main.js`, apunta al
+  RDS pre-prod). Los background tasks del harness mueren a los minutos; se corre detached
   (`Start-Process -WindowStyle Hidden`) y se baja con `Stop-Process` por PID / `Get-NetTCPConnection -LocalPort 3000`.
   A veces lo levanta la sesión `agente-mobile` para grabar / correr e2e; devuelve el puerto al terminar.
 
@@ -110,13 +114,11 @@ contrato de integración del agente → `reference/handoff-integracion-agente.md
 
 - **Catálogo A2UI v0.6.0 / v0.7.0 / v0.7.1** — vive en `demoCompose` + `agente-mobile`.
   `marketplace-backend` **no cambió** para ese tren.
-- **Merge de docs** (`chore/docs-restructure`) — los 3 repos lo tienen en rama; se mergean juntos.
-- **Redeploy de `api.brodriro.dev`** desde el `master` actual — el merge a `master` ya está
-  hecho y pusheado; el RDS ya está migrado, así que el redeploy no necesita paso de migración
-  extra. Desbloquea el endpoint promo y el SKU opcional del panel en prod.
+- **Merge de docs** (`chore/docs-restructure`) — ✅ hecho en los 3 repos (este repo: PR #1).
+- **Redeploy de `api.brodriro.dev`** — ❌ descartado por el usuario, no en curso.
 
 ### Quién bloquea a quién
 
-- `agente-mobile` ya cableó `HttpPromoCodeRepository`; funciona contra el `:3000` local (que
-  corre `master`) pero **no contra `api.brodriro.dev` hasta confirmar/hacer el redeploy**.
-- Nada de `marketplace-backend` bloquea hoy a los otros repos para el tren v0.7.x del catálogo.
+- Nada de `marketplace-backend` bloquea hoy a los otros repos: el tren v0.7.x del catálogo no lo
+  toca, y el redeploy de prod que bloqueaba a `agente-mobile`/`HttpPromoCodeRepository` contra
+  `api.brodriro.dev` quedó sin efecto al descartarse el deploy — todos corren contra `:3000` local.
