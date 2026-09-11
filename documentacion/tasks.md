@@ -72,6 +72,10 @@ _(nada activo — ver "Retomar acá" y [`handoff.md`](handoff.md) para lo últim
 - **Job de limpieza de usuarios throwaway (opción B).** `agent+<contextId>@agent.brodriro.dev`
   por sesión A2A, de antes de M1/A4 (ver corrección en `reference/handoff-integracion-agente.md`);
   nada los borra. Sin dueño.
+- **`POST /cart/items` sin `Idempotency-Key`** (detectado por `@app` vía `manage_cart`,
+  2026-09-11). A diferencia de `POST /orders`, el controller no lee el header —
+  `cart.service.ts:59-67` hace `quantity: { increment: dto.quantity } }` en el upsert, así que un
+  retry ante un transport error duplica cantidad. Sin cerrar desde `e2e-M8-20260910-02`. Sin dueño.
 
 ## Notas
 
