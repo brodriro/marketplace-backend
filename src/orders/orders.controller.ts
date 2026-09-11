@@ -15,6 +15,7 @@ import type { JwtPayload } from '../auth/jwt-payload.type';
 import { CancelOrderDto } from './dto/cancel-order.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrdersService } from './orders.service';
+import { ApiTags } from '@nestjs/swagger';
 
 /** `X-E2E-Run` sólo se propaga a `meta` si matchea el formato de runId (plan E2E §7.2). */
 const E2E_RUN_ID_RE = /^e2e-M\d+-\d{8}-\d{2}$/;
@@ -22,6 +23,7 @@ const e2eRunId = (h?: string): string | undefined =>
   h && E2E_RUN_ID_RE.test(h) ? h : undefined;
 
 @UseGuards(JwtAuthGuard)
+@ApiTags('orders')
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}

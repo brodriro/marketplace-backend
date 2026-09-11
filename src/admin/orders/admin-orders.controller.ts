@@ -18,10 +18,12 @@ import { AuditInterceptor } from '../audit/audit.interceptor';
 import { AdminOrdersQueryDto } from '../../orders/dto/admin-orders-query.dto';
 import { UpdateOrderStatusDto } from '../../orders/dto/update-order-status.dto';
 import { OrdersService } from '../../orders/orders.service';
+import { ApiTags } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.admin)
 @UseInterceptors(AuditInterceptor)
+@ApiTags('admin')
 @Controller('admin/orders')
 export class AdminOrdersController {
   constructor(private readonly ordersService: OrdersService) {}

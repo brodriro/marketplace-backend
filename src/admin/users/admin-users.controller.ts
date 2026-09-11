@@ -20,10 +20,12 @@ import { UpdateUserActiveDto } from '../../users/dto/update-user-active.dto';
 import { UpdateUserRoleDto } from '../../users/dto/update-user-role.dto';
 import { UpdateUserDto } from '../../users/dto/update-user.dto';
 import { UsersService } from '../../users/users.service';
+import { ApiTags } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.admin)
 @UseInterceptors(AuditInterceptor)
+@ApiTags('admin')
 @Controller('admin/users')
 export class AdminUsersController {
   constructor(private readonly usersService: UsersService) {}

@@ -17,10 +17,12 @@ import { AuditInterceptor } from '../audit/audit.interceptor';
 import { CategoriesService } from '../../categories/categories.service';
 import { CreateCategoryDto } from '../../categories/dto/create-category.dto';
 import { UpdateCategoryDto } from '../../categories/dto/update-category.dto';
+import { ApiTags } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.admin)
 @UseInterceptors(AuditInterceptor)
+@ApiTags('admin')
 @Controller('admin/categories')
 export class AdminCategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}

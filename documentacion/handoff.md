@@ -8,6 +8,29 @@
 
 ---
 
+## 2026-09-11 · M8/B8 follow-up · `@nestjs/swagger` + `GET /docs` + `pnpm run openapi:dump`
+
+- **Qué:** `documentacion/openapi.json` ya no es el esqueleto estático de M0 — se genera desde los
+  decorators. `GET /docs` (Swagger UI, montado en `main.ts` sin prefijo `/v1`) sirve el mismo
+  documento en vivo; `pnpm run openapi:dump` (script nuevo, `src/openapi-dump.ts`) lo vuelca a
+  disco booteando un `INestApplication` sin levantar el server. `src/openapi.ts` centraliza el
+  `DocumentBuilder` (título, bearer auth, tags) compartido por ambos caminos. Se agregó
+  `@ApiTags(...)` a los 22 controllers para que el doc quede agrupado igual que el esqueleto viejo.
+  `documentacion/API.md` actualizado para reflejar que esto ya no es pendiente.
+- **Por qué:** último follow-up no bloqueante del hito M8 (ver `tasks.md`), pedido explícito del
+  usuario tras cerrar el hilo `track_order`.
+- **Archivos clave:** `src/main.ts`, `src/openapi.ts`, `src/openapi-dump.ts`, `package.json`
+  (`openapi:dump`), `pnpm-workspace.yaml` (`@scarf/scarf: false` — resuelve el warning de builds
+  ignorados de pnpm que quedó a mitad, no relacionado a swagger).
+- **Follow-ups / gotchas para la próxima vez:** `@nestjs/swagger@latest` instala la v12, que pide
+  `@nestjs/common@^12` — este repo sigue en `^11.x`, así que quedó fijado en `@nestjs/swagger@11.4.7`
+  (última compatible con Nest 11). Si se actualiza `@nestjs/common` a v12 en el futuro, subir
+  `@nestjs/swagger` a la par. Separado: un `tsconfig.build.tsbuildinfo` corrupto puede hacer que
+  `tsc`/`nest build` "tengan éxito" sin generar `dist/` — si `dist/main` da `MODULE_NOT_FOUND` pese a
+  "0 errors", borrar el `.tsbuildinfo` y recompilar.
+
+---
+
 ## 2026-09-11 · E2E `track_order` dedicado (`e2e-M4-20260911-01`) · 7/7 estados de `OrderStatus`
 
 - **Qué:** corrida e2e coordinada entre `@backend`/`@app`/`@agente` para verificar el flujo

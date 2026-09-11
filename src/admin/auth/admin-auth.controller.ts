@@ -21,6 +21,7 @@ import { RolesGuard } from '../../auth/roles.guard';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import type { JwtPayload } from '../../auth/jwt-payload.type';
 import { Role } from '../../generated/prisma/client';
+import { ApiTags } from '@nestjs/swagger';
 import {
   ADMIN_REFRESH_COOKIE,
   clearSessionCookies,
@@ -33,6 +34,7 @@ import {
  * token nunca viaja en el body: `admin_session` (access, httpOnly), `admin_refresh` (refresh,
  * httpOnly), `admin_csrf` (legible por JS, se reenvía en `X-CSRF-Token`).
  */
+@ApiTags('admin')
 @Controller('admin/auth')
 export class AdminAuthController {
   constructor(

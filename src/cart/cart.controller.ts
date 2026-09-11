@@ -15,6 +15,7 @@ import { CartService } from './cart.service';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { MergeCartDto } from './dto/merge-cart.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
+import { ApiTags } from '@nestjs/swagger';
 
 /**
  * Carrito persistido por usuario (plan E2E, hito M2). Todas las rutas requieren bearer.
@@ -22,6 +23,7 @@ import { UpdateCartItemDto } from './dto/update-cart-item.dto';
  * deduplica (la tabla `IdempotencyKey` llega en M5/B4).
  */
 @UseGuards(JwtAuthGuard)
+@ApiTags('cart')
 @Controller('cart')
 export class CartController {
   constructor(private readonly cartService: CartService) {}

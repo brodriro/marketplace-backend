@@ -5,9 +5,11 @@ import { RolesGuard } from '../../auth/roles.guard';
 import { Role } from '../../generated/prisma/client';
 import { AuditLogQueryDto } from './audit-log-query.dto';
 import { AuditLogService } from './audit-log.service';
+import { ApiTags } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.admin)
+@ApiTags('admin')
 @Controller('admin/audit-logs')
 export class AdminAuditController {
   constructor(private readonly auditLog: AuditLogService) {}

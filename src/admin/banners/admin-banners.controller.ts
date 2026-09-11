@@ -19,10 +19,12 @@ import { BannersService } from '../../banners/banners.service';
 import { CreateBannerDto } from '../../banners/dto/create-banner.dto';
 import { UpdateBannerDto } from '../../banners/dto/update-banner.dto';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { ApiTags } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.admin)
 @UseInterceptors(AuditInterceptor)
+@ApiTags('admin')
 @Controller('admin/banners')
 export class AdminBannersController {
   constructor(private readonly bannersService: BannersService) {}

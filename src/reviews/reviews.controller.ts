@@ -4,7 +4,9 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { JwtPayload } from '../auth/jwt-payload.type';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { ReviewsService } from './reviews.service';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('reviews')
 @Controller('products/:productId/reviews')
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}

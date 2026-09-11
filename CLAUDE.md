@@ -138,8 +138,10 @@ or `POST /orders/:id/confirm` (allowed when `provider.allowsUnverifiedConfirm` â
 `bypass`, only with `STRIPE_DEMO_CONFIRM=true` for `stripe`; else `404`). Both clear the cart and
 fire the `order_status_changed` notification. `OrderPaymentSweepService` (`@Cron` every minute)
 cancels `pending_payment` orders older than `ORDER_PAYMENT_TTL_MIN` (default 30) and restocks.
-`OrderStatusHistory.meta` carries `e2eRunId` when a transition request has a valid `X-E2E-Run`
-header.
+The system transition above (`markPaidBySystem`) stamps `e2eRunId` into `OrderStatusHistory.meta`
+when the triggering request carries a valid `X-E2E-Run` header. Admin-driven transitions
+(`PATCH /admin/orders/:id/status`) do **not** â€” there it lands in `AuditLog.meta` instead, via
+`AuditInterceptor`.
 
 ### Notifications: `Notification` model (delivery) vs `StockAlert` (subscription)
 

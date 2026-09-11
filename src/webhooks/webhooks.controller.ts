@@ -12,6 +12,7 @@ import {
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
 import { OrdersService } from '../orders/orders.service';
+import { ApiTags } from '@nestjs/swagger';
 import {
   PAYMENT_PROVIDER,
   type PaymentProvider,
@@ -23,6 +24,7 @@ import {
  * (`PaymentProvider.verifyWebhook` sobre `req.rawBody`) es la autenticación. Si el proveedor activo
  * no maneja webhooks (p. ej. `bypass`) → `404`.
  */
+@ApiTags('webhooks')
 @Controller({ path: 'webhooks/stripe', version: VERSION_NEUTRAL })
 export class WebhooksController {
   private readonly logger = new Logger(WebhooksController.name);

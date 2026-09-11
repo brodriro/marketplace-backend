@@ -15,7 +15,9 @@ import { CreateStockAlertDto } from './dto/create-stock-alert.dto';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { SearchProductsQueryDto } from './dto/search-products-query.dto';
 import { ProductsService } from './products.service';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('products')
 @Controller('products')
 export class ProductsController {
   constructor(

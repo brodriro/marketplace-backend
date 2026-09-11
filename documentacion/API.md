@@ -10,17 +10,19 @@ contrato **v1** (plan E2E) que todavía no está implementado.
 > ⚠️ **Desactualizado (M0→M8 ya mergeados y cerrados, 2026-09-10):** el marco "v0 actual / v1
 > pendiente" de este archivo quedó viejo — **v1 es la versión actual**, `VERSION_NEUTRAL` ya se
 > removió (M8: rutas sin `/v1` → `404`, salvo el webhook del proveedor) y todos los deltas de abajo
-> están implementados. La regeneración real de este archivo desde el código (`@nestjs/swagger` +
-> `pnpm run openapi:dump`) sigue como follow-up sin hacer — ver `tasks.md`. Hasta entonces, leer los
-> "✅ implementado" de abajo como el contrato vigente, no como pendiente.
+> están implementados. Este documento sigue siendo la referencia legible; el contrato máquina real
+> ahora se genera desde los decorators (`@nestjs/swagger`) — `GET /docs` (Swagger UI) contra un
+> backend levantado, o `pnpm run openapi:dump` para volcarlo a `openapi.json`. Hasta que alguien
+> reescriba este archivo desde cero, leer los "✅ implementado" de abajo como el contrato vigente,
+> no como pendiente.
 
 ---
 
 ## Próxima versión (v1) — contrato E2E congelado (M0, 2026-09-06)
 
 > Estado: **implementado y en `master` (M1→M8), no "congelado, sin implementar"** — ver nota de
-> arriba. El contrato máquina completo debería estar en [`openapi.json`](openapi.json), pero ese
-> archivo sigue siendo el esqueleto de M0 (no se regeneró — mismo follow-up). El plan y los hitos:
+> arriba. El contrato máquina completo vive en [`openapi.json`](openapi.json), generado desde los
+> decorators (`pnpm run openapi:dump`) — ya no es el esqueleto estático de M0. El plan y los hitos:
 > `demoCompose/docs/plan-e2e.md` §6. Esta sección lista sólo los **deltas** contra la v0 documentada
 > más abajo.
 
@@ -28,9 +30,10 @@ contrato **v1** (plan E2E) que todavía no está implementado.
 
 Todas las rutas se sirven bajo **`/v1/...`** (`app.enableVersioning({ type: URI })`). El alias sin
 prefijo (`VERSION_NEUTRAL`) que existió durante el cutover **se removió en M8** — una ruta sin
-`/v1` da `404`. `GET /docs` (Swagger UI) + `GET /openapi.json` **no llegaron** (siguen de
-follow-up). Breaking futuro → `/v2`. **Excepción:** `POST /webhooks/stripe` se monta sin el
-prefijo `/v1` (decisión propia del controller, no un alias temporal).
+`/v1` da `404`. `GET /docs` (Swagger UI, sin `/v1`) sirve el contrato generado desde los decorators;
+`pnpm run openapi:dump` vuelca el mismo documento a `documentacion/openapi.json`. Breaking futuro →
+`/v2`. **Excepción:** `POST /webhooks/stripe` se monta sin el prefijo `/v1` (decisión propia del
+controller, no un alias temporal).
 
 ### Auth: par access + refresh — ✅ implementado (M1, rama `feat/e2e-m1-auth-refresh`)
 

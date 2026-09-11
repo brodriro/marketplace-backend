@@ -5,6 +5,8 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AppConfig } from './config/configuration';
+import { buildOpenApiDocument } from './openapi';
+import { SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   // `rawBody: true` deja `req.rawBody` (Buffer) disponible para verificar la firma del webhook de
@@ -35,6 +37,11 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // M8/B8 follow-up: `GET /docs` sirve el contrato generado desde los decorators (reemplaza al
+  // esqueleto estático de M0). `pnpm run openapi:dump` vuelca el mismo documento a
+  // `documentacion/openapi.json` sin levantar el server (ver `src/openapi.ts`).
+  SwaggerModule.setup('docs', app, buildOpenApiDocument(app));
 
   await app.listen(configService.get('port', { infer: true }));
 }

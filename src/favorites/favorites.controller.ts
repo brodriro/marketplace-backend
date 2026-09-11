@@ -12,8 +12,10 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { JwtPayload } from '../auth/jwt-payload.type';
 import { FavoritesService } from './favorites.service';
+import { ApiTags } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard)
+@ApiTags('favorites')
 @Controller('favorites')
 export class FavoritesController {
   constructor(private readonly favoritesService: FavoritesService) {}

@@ -4,10 +4,12 @@ import { Roles } from '../../auth/roles.decorator';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Role } from '../../generated/prisma/client';
 import { AdminAgentConfigService } from './admin-agent-config.service';
+import { ApiTags } from '@nestjs/swagger';
 
 /** `GET /v1/admin/agent-config` — versión/checksum del catálogo + config de la integración (M7 / B6). */
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.admin)
+@ApiTags('admin')
 @Controller('admin/agent-config')
 export class AdminAgentConfigController {
   constructor(private readonly agentConfig: AdminAgentConfigService) {}

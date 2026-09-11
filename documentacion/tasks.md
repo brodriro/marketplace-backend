@@ -59,8 +59,7 @@ _(nada activo — ver "Retomar acá" y [`handoff.md`](handoff.md) para lo últim
 - **M8 · B8 + deploy.** ✅ Cerrado 2026-09-10 (parcial — deploy de prod descartado por el usuario).
   - ✅ Cutover `/v1` (remoción de `VERSION_NEUTRAL`) — `origin/master @ 0213307` (PR #10).
   - ✅ Ensayo E2E del loop completo — `e2e-M8-20260910-01`, 6/6 §4. **Entregable final del hilo.**
-  - ⏳ `@nestjs/swagger` → `GET /docs` + `pnpm run openapi:dump` — no hecho, **follow-up no
-    bloqueante** (ver "todo").
+  - ✅ `@nestjs/swagger` → `GET /docs` + `pnpm run openapi:dump` — cerrado 2026-09-11, ver `handoff.md`.
   - ❌ Redeploy `api.brodriro.dev` — **descartado**: sin deploy de prod, todo localhost.
 
 ## blocked
@@ -70,10 +69,6 @@ _(nada activo — ver "Retomar acá" y [`handoff.md`](handoff.md) para lo últim
 
 ## todo
 
-- **M8 · `@nestjs/swagger` + `openapi:dump`** (follow-up no bloqueante). Agregar `@nestjs/swagger`,
-  exponer `GET /docs`, script `pnpm run openapi:dump` que regenere `documentacion/openapi.json` desde
-  los decoradores (hoy `openapi.json` es el esqueleto de M0, refleja el contrato pero no se genera
-  del código). Hacer solo si el usuario lo pide.
 - **Job de limpieza de usuarios throwaway (opción B).** `agent+<contextId>@agent.brodriro.dev`
   por sesión A2A, de antes de M1/A4 (ver corrección en `reference/handoff-integracion-agente.md`);
   nada los borra. Sin dueño.
@@ -84,6 +79,3 @@ _(nada activo — ver "Retomar acá" y [`handoff.md`](handoff.md) para lo últim
   Tarea de `demoCompose`, referencia cruzada.
 - `discountCode` en `POST /orders` se acepta y hashea pero **no se aplica al `total`** (integración
   con `promo-codes` = follow-up sin dueño).
-- Transiciones admin de pedido: `e2eRunId` va a `AuditLog.meta`, **no** a `OrderStatusHistory.meta`
-  (solo el tramo system lo estampa en el history). El wording de la sección Payments de `CLAUDE.md`
-  quedó impreciso en ese punto.

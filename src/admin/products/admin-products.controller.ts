@@ -21,10 +21,12 @@ import { CreateVariantDto } from '../../products/dto/create-variant.dto';
 import { UpdateProductDto } from '../../products/dto/update-product.dto';
 import { UpdateVariantDto } from '../../products/dto/update-variant.dto';
 import { ProductsService } from '../../products/products.service';
+import { ApiTags } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.admin)
 @UseInterceptors(AuditInterceptor)
+@ApiTags('admin')
 @Controller('admin/products')
 export class AdminProductsController {
   constructor(private readonly productsService: ProductsService) {}
