@@ -8,6 +8,30 @@
 
 ---
 
+## 2026-09-11 · E2E `track_order` dedicado (`e2e-M4-20260911-01`) · 7/7 estados de `OrderStatus`
+
+- **Qué:** corrida e2e coordinada entre `@backend`/`@app`/`@agente` para verificar el flujo
+  `track_order` (mobile pide estado de pedido en el chat → `agente-mobile` llama la tool →
+  `GET /v1/orders/:id` → respuesta renderizada) contra los 7 estados de `OrderStatus`. `paid`,
+  `shipped` y `cancelled` ya existían en `demo@marketplace.dev`; se armaron y transicionaron acá
+  los 4 que faltaban (`pending_payment`, `preparing`, `delivered`, `refunded`) vía
+  `POST /orders` + `POST /orders/:id/confirm` + `PATCH /admin/orders/:id/status`, tageados con el
+  `runId` para correlacionar en `mb-3000.log`. Resultado: **7/7 verificados, nativo y por chat**.
+  De paso se confirmó el contrato de `GET /orders/:id` (PK exacta vía `prisma.findUnique`, sin
+  lookup por prefix/short-id — el gap de ids truncados a 8 chars en `track_order` es de
+  `agente-mobile`/UX) y se detectó (y `@app` resolvió de su lado) que
+  `POST /products/:id/alerts` no es idempotente (`stockAlert.create` sin `@@unique`).
+- **Por qué:** cobertura pendiente desde el cierre del hilo E2E principal (2026-09-10) — hito
+  "bonus" no bloqueante, pedido por el usuario para no dejar 4 estados sin ejercitar en el loop.
+- **Archivos clave:** `src/orders/order-transitions.ts` (matriz), `src/admin/orders/admin-orders.controller.ts`,
+  `src/common/e2e-run-logger.interceptor.ts` (logging por `X-E2E-Run`). IDs de los 4 pedidos
+  sintéticos y detalle completo del readout: `demoCompose/docs/plan-e2e.md` §7.4,
+  `demoCompose` `handoff.md` 2026-09-11.
+- **Follow-ups:** ninguno bloqueante. `StockAlert` sigue sin constraint único (aceptado por ahora,
+  mitigado del lado cliente con guard in-flight).
+
+---
+
 ## 2026-09-10 · Plan E2E · limpieza de ramas/worktrees zombie (post-corrida `-02`)
 
 - **Qué:** sync de `master` local (estaba 21 commits atrás de `origin/master`, colgado en

@@ -25,10 +25,12 @@ M0→M8 code-complete en `origin/master @ 0213307` (PR #10 = cutover a `/v1` pur
   `feat/e2e-m5-payments`, `feat/e2e-m8-v1-cutover`, `feat/catalog-promo-sku-es-names`) borrados —
   todas eran ancestros de `origin/master`, ya mergeadas vía PR.
 - **No queda nada activo del hilo E2E.** Los follow-ups que sobreviven son no bloqueantes — ver "todo".
+- **Bonus cerrado 2026-09-11:** e2e dedicado de `track_order`, 7/7 estados de `OrderStatus`
+  verificados (nativo + chat). Detalle en [`handoff.md`](handoff.md).
 
 ## doing
 
-- _(nada en progreso)_
+_(nada activo — ver "Retomar acá" y [`handoff.md`](handoff.md) para lo último cerrado.)_
 
 ## E2E — lane de `@backend` (contrato congelado en `plan-e2e.md` §6)
 
