@@ -77,11 +77,12 @@ líneas cuya variante/producto quedó `visible:false` (soft-deleted); `POST /car
 | POST | `/cart/items` | Body `{ variantId \| sku, quantity }` — acepta cualquiera de los dos, se resuelve server-side. `quantity` se **suma** a la línea existente (nunca crea dos líneas). Acepta `Idempotency-Key` opcional. |
 | PATCH | `/cart/items/:variantId` | Body `{ quantity }` — cantidad **absoluta**; `0` borra la línea. |
 | DELETE | `/cart/items/:variantId` | Quita una línea. |
-| DELETE | `/cart` | Vacía el carrito. |
+| PATCH | `/cart` | Body `{ discountCode: string \| null }` (2026-09-12) — persiste (o `null` limpia) un código de descuento a nivel carrito, para que un checkout conversacional no tenga que repetirlo turno a turno. Solo valida existencia/vigencia (mismo `404 { error, code: "invalid_discount_code" }` que `GET /promo-codes/:code`) — **no** valida `minPurchase` (depende del subtotal al momento de pagar; eso lo re-chequea `POST /orders`). El código persistido **no** se aplica solo — quien arma el checkout debe seguir mandando `discountCode` en `POST /orders` (leyéndolo de `GET /cart` en vez de tener que recordarlo). |
+| DELETE | `/cart` | Vacía el carrito (ítems **y** `discountCode`). |
 | POST | `/cart/merge` | Body `{ items: [{ variantId\|sku, quantity }] }` — merge del carrito local al login. Unión de líneas, `quantity = max(local, server)` (idempotente). El cliente limpia su carrito local tras el `200`. |
 
-Respuesta de todos: `{ items: [{ variantId, sku, productId, name, color, image, quantity,
-unitPrice, lineTotal }], itemCount, subtotal }`.
+Respuesta de todos (salvo notas en contrario): `{ items: [{ variantId, sku, productId, name, color,
+image, quantity, unitPrice, lineTotal }], itemCount, subtotal, discountCode: string | null }`.
 
 ### Ciclo de vida del pedido (M4)
 

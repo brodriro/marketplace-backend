@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PromoCodesService } from '../promo-codes/promo-codes.service';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { MergeCartLineDto } from './dto/merge-cart.dto';
 
@@ -26,6 +27,7 @@ export interface CartView {
   items: CartItemView[];
   itemCount: number;
   subtotal: string;
+  discountCode: string | null;
 }
 
 type VariantWithProduct = Prisma.ProductVariantGetPayload<{
@@ -44,14 +46,45 @@ const cartInclude = {
 
 @Injectable()
 export class CartService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly promoCodes: PromoCodesService,
+  ) {}
 
   async getCart(userId: string): Promise<CartView> {
     const cart = await this.prisma.cart.findUnique({
       where: { userId },
       include: cartInclude,
     });
-    return this.toView(cart?.items ?? []);
+    return this.toView(cart?.items ?? [], cart?.discountCode ?? null);
+  }
+
+  /**
+   * `PATCH /cart`: persiste (o limpia) el código de descuento a nivel carrito para que un
+   * checkout conversacional no tenga que repetirlo turno a turno. Solo valida existencia/vigencia
+   * (`PromoCodesService.validate`, mismo 404 `{ error, code: "invalid_discount_code" }`) — el
+   * `minPurchase` depende del subtotal al momento de pagar, así que se re-chequea en
+   * `POST /orders` (`OrdersService.applyDiscount`), no acá.
+   */
+  async setDiscountCode(
+    userId: string,
+    discountCode: string | null,
+  ): Promise<CartView> {
+    const cart = await this.ensureCart(userId);
+    if (discountCode === null) {
+      await this.prisma.cart.update({
+        where: { id: cart.id },
+        data: { discountCode: null },
+      });
+      return this.getCart(userId);
+    }
+
+    const promo = await this.promoCodes.validate(discountCode);
+    await this.prisma.cart.update({
+      where: { id: cart.id },
+      data: { discountCode: promo.code },
+    });
+    return this.getCart(userId);
   }
 
   /**
@@ -173,8 +206,13 @@ export class CartService {
     const cart = await this.prisma.cart.findUnique({ where: { userId } });
     if (cart) {
       await this.prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
+      // Un carrito vacío no debería arrastrar un descuento viejo silenciosamente.
+      await this.prisma.cart.update({
+        where: { id: cart.id },
+        data: { discountCode: null },
+      });
     }
-    return this.toView([]);
+    return this.toView([], null);
   }
 
   /** Unión de líneas; para cada variante `quantity = max(local, server)`. Idempotente. */
@@ -238,6 +276,7 @@ export class CartService {
     items: Prisma.CartItemGetPayload<{
       include: { variant: { include: { product: true } } };
     }>[],
+    discountCode: string | null,
   ): CartView {
     let subtotal = new Prisma.Decimal(0);
     let itemCount = 0;
@@ -261,7 +300,12 @@ export class CartService {
       };
     });
 
-    return { items: views, itemCount, subtotal: subtotal.toFixed(2) };
+    return {
+      items: views,
+      itemCount,
+      subtotal: subtotal.toFixed(2),
+      discountCode,
+    };
   }
 
   private hashAddItemRequest(dto: AddCartItemDto): string {

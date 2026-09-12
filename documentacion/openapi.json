@@ -368,6 +368,28 @@
           "cart"
         ]
       },
+      "patch": {
+        "operationId": "CartController_setDiscountCode",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetCartDiscountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "cart"
+        ]
+      },
       "delete": {
         "operationId": "CartController_clear",
         "parameters": [],
@@ -1587,6 +1609,10 @@
         "properties": {}
       },
       "CreateStockAlertDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "SetCartDiscountDto": {
         "type": "object",
         "properties": {}
       },

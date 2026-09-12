@@ -8,6 +8,32 @@
 
 ---
 
+## 2026-09-12 · `PATCH /cart` — persistir `discountCode` a nivel carrito
+
+- **Qué:** `Cart.discountCode String?` (migración `20260912033508_cart_discount_code`, aplicada
+  al RDS pre-prod) + `PATCH /cart { discountCode: string | null }` para setear/limpiar. Solo
+  valida existencia/vigencia (`CartService.setDiscountCode` delega en
+  `PromoCodesService.validate`, mismo 404 `{ error, code: "invalid_discount_code" }`) — **no**
+  valida `minPurchase` (depende del subtotal al momento de pagar, sigue siendo
+  `OrdersService.applyDiscount` en `POST /orders` quien lo hace). `GET /cart` y toda mutación de
+  ítems ahora devuelven `discountCode` en el `CartView`; `clear()` (`DELETE /cart`) también lo
+  limpia, igual que ya hacía con los ítems.
+- **Por qué:** pedido de `agente` tras implementar `apply_discount_code` como tool real — sin esto,
+  el código de descuento se perdía entre turnos de un checkout conversacional (`GET /v1/cart` no
+  lo devolvía) y dependían de que el LLM lo repitiera de memoria al confirmar la compra, algo
+  frágil en conversaciones largas. Es explícitamente **almacenamiento pasivo**: nada lee
+  `Cart.discountCode` para auto-completar `POST /orders` — quien arma el checkout lo sigue
+  mandando en el body, ahora leyéndolo de `GET /cart` en vez de tener que recordarlo él mismo.
+- **Archivos clave:** `prisma/schema.prisma` (`Cart.discountCode`),
+  `prisma/migrations/20260912033508_cart_discount_code/`, `src/cart/cart.service.ts`
+  (`setDiscountCode`, `toView`, `clear`), `src/cart/cart.controller.ts`,
+  `src/cart/dto/set-cart-discount.dto.ts`, `src/cart/cart.module.ts` (importa `PromoCodesModule`),
+  `src/cart/cart.service.spec.ts` (nuevo, 5 casos), `documentacion/{API.md,CLAUDE.md}`.
+- **Verificado:** unit tests nuevos (5/5) + suite completa 20/20 verde. Smoke-test en vivo contra
+  `:3000`/RDS pre-prod: set con código válido → persiste y normaliza a mayúsculas; set con código
+  inválido → `404` sin tocar el carrito (el código previo se mantiene); `null` → limpia;
+  `DELETE /cart` con un código aplicado → carrito e ítems vacíos, `discountCode: null`.
+
 ## 2026-09-11 (noche) · `discountCode` se aplica al `total` de `POST /orders` + stemming de color en `search`
 
 - **Qué:** dos follow-ups sin dueño que estaban en `tasks.md`, a pedido explícito del usuario:

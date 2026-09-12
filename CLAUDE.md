@@ -116,7 +116,17 @@ reflected in `GET /promo-codes/:code`, which stays preview-only/non-mutating). `
 checked against the full subtotal (`409 { error, minPurchase }` if short); `appliesToCategory`
 scopes the discount to that category's share of the subtotal, clamping `fixed_amount` so `total`
 never goes negative. `discountCode` (normalized upper-case) and `discountAmount` are persisted on
-`Order` and both are part of the `Idempotency-Key` request hash.
+`Order` and both are part of the `Idempotency-Key` request hash. The same `404`/`code`
+(`invalid_discount_code`) shape is used by both endpoints for consistency.
+
+**Cart-level `discountCode` (2026-09-12):** `PATCH /cart { discountCode }` persists (or, with
+`null`, clears) a code on `Cart` so a conversational checkout doesn't have to re-send it every
+turn — `CartService.setDiscountCode` only validates existence/expiry (delegates to
+`PromoCodesService.validate`, same 404 shape), **not** `minPurchase` (subtotal-dependent, still
+enforced by `OrdersService.applyDiscount` at order time). This is passive storage only — nothing
+reads `Cart.discountCode` to auto-fill `POST /orders`; the checkout caller still has to pass
+`discountCode` explicitly, just sourced from `GET /cart` instead of having to remember it.
+`CartService.clear()` also nulls it out, same as it does for items.
 
 ### Payments — provider-agnostic (M5, `feat/e2e-m5-payments`, task B4)
 

@@ -177,8 +177,13 @@ model ProductVariant {
 model Cart {
   id        String   @id @default(uuid())
   userId    String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // Código validado (existencia/vigencia, NO minPurchase — eso depende del subtotal al momento
+  // de pagar) vía `PATCH /cart`. Sobrevive entre turnos de un checkout conversacional; se limpia
+  // al vaciar el carrito. `POST /orders` re-valida todo (incluido minPurchase) igual que si viniera
+  // por body — este campo es sólo para que el cliente no tenga que repetirlo.
+  discountCode String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   user  User       @relation(fields: [userId], references: [id])
   items CartItem[]

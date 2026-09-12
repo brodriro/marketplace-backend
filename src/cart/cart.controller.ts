@@ -15,6 +15,7 @@ import type { JwtPayload } from '../auth/jwt-payload.type';
 import { CartService } from './cart.service';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { MergeCartDto } from './dto/merge-cart.dto';
+import { SetCartDiscountDto } from './dto/set-cart-discount.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { ApiTags } from '@nestjs/swagger';
 
@@ -23,6 +24,8 @@ import { ApiTags } from '@nestjs/swagger';
  * `Idempotency-Key` opcional en `POST /cart/items` — deduplica un retry ante un transport error
  * (mismo lock-y-replay que `POST /orders`, ver `CartService.addItem`). A diferencia de `/orders`,
  * acá NO es obligatoria: sin el header, se mantiene el comportamiento de siempre (increment).
+ * `PATCH /cart` persiste (o limpia con `null`) un `discountCode` a nivel carrito — sobrevive entre
+ * turnos de un checkout conversacional; `POST /orders` re-valida todo igual que si viniera por body.
  */
 @UseGuards(JwtAuthGuard)
 @ApiTags('cart')
@@ -33,6 +36,14 @@ export class CartController {
   @Get()
   getCart(@CurrentUser() user: JwtPayload) {
     return this.cartService.getCart(user.sub);
+  }
+
+  @Patch()
+  setDiscountCode(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: SetCartDiscountDto,
+  ) {
+    return this.cartService.setDiscountCode(user.sub, dto.discountCode);
   }
 
   @Post('items')

@@ -217,11 +217,7 @@ describe('OrdersService.create — idempotencia + stock (§6.5)', () => {
         .mockResolvedValueOnce(variant('v-a', 5, 10));
       tx.promoCode.findUnique.mockResolvedValueOnce(promo({ value: 10 }));
 
-      await service.create(
-        'u1',
-        dto({ discountCode: 'welcome10' }),
-        'key-1',
-      );
+      await service.create('u1', dto({ discountCode: 'welcome10' }), 'key-1');
 
       expect(tx.promoCode.findUnique).toHaveBeenCalledWith({
         where: { code: 'WELCOME10' },
@@ -267,7 +263,9 @@ describe('OrdersService.create — idempotencia + stock (§6.5)', () => {
       tx.productVariant.findUnique
         .mockResolvedValueOnce(variant('v-b', 5, 10))
         .mockResolvedValueOnce(variant('v-a', 5, 10));
-      tx.promoCode.findUnique.mockResolvedValueOnce(promo({ minPurchase: 100 }));
+      tx.promoCode.findUnique.mockResolvedValueOnce(
+        promo({ minPurchase: 100 }),
+      );
 
       const err = await service
         .create('u1', dto({ discountCode: 'WELCOME10' }), 'key-1')

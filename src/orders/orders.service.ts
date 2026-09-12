@@ -634,7 +634,8 @@ export class OrdersService {
     const minPurchase = promo.minPurchase.toNumber();
     if (subtotal < minPurchase) {
       throw new ConflictException({
-        error: 'El subtotal no alcanza el mínimo de compra del código de descuento',
+        error:
+          'El subtotal no alcanza el mínimo de compra del código de descuento',
         minPurchase: minPurchase.toFixed(2),
       });
     }
