@@ -27,6 +27,11 @@ M0→M8 code-complete en `origin/master @ 0213307` (PR #10 = cutover a `/v1` pur
 - **No queda nada activo del hilo E2E.** Los follow-ups que sobreviven son no bloqueantes — ver "todo".
 - **Bonus cerrado 2026-09-11:** e2e dedicado de `track_order`, 7/7 estados de `OrderStatus`
   verificados (nativo + chat). Detalle en [`handoff.md`](handoff.md).
+- **Bonus cerrado 2026-09-11/12:** los 2 últimos follow-ups del backlog (`discountCode` aplicado al
+  `total` en `POST /orders` + stemming de color en `search`), más 2 rondas de coordinación con
+  `agente` que salieron de eso (`code: "invalid_discount_code"` estructurado en el 404, y
+  `PATCH /cart` para persistir `discountCode` entre turnos de checkout). `agente` y `mobile` ya
+  confirmaron sus lados. Detalle completo en [`handoff.md`](handoff.md) (4 entradas).
 
 ## doing
 
