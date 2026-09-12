@@ -8,6 +8,24 @@
 
 ---
 
+## 2026-09-11 · `POST /cart/items` — soporte de `Idempotency-Key` (opcional)
+
+- **Qué:** `Idempotency-Key` opcional en `POST /cart/items`, mismo lock-y-replay que
+  `OrdersService.create` sobre la tabla `IdempotencyKey`: misma key + mismo body → replay de la
+  respuesta guardada (no incrementa cantidad de nuevo); misma key + body distinto → `409`; sin
+  header → comportamiento de siempre (`increment`). A diferencia de `/orders`, acá **no** es
+  obligatoria (carrito no es una operación de una sola vez) — sin header no rompe clientes
+  existentes. Verificado en vivo: retry con misma key no duplica, key nueva sí incrementa, mismo
+  key + body distinto da `409`.
+- **Por qué:** `@app` detectó vía `manage_cart` que un retry ante un transport error duplicaba
+  cantidad en el carrito — gap abierto desde `e2e-M8-20260910-02`, sin cerrar hasta ahora.
+- **Archivos clave:** `src/cart/cart.service.ts` (`addItem` + `addItemUnchecked` +
+  `hashAddItemRequest`/`isEmptyJson`), `src/cart/cart.controller.ts` (header `Idempotency-Key`).
+- **Follow-ups:** falta que `@agente` mande el header en `manage_cart` (como ya hace `checkout`)
+  para que el fix tenga efecto end-to-end — sin dueño todavía del lado agente.
+
+---
+
 ## 2026-09-11 · M8/B8 follow-up · `@nestjs/swagger` + `GET /docs` + `pnpm run openapi:dump`
 
 - **Qué:** `documentacion/openapi.json` ya no es el esqueleto estático de M0 — se genera desde los

@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto';
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -52,7 +54,68 @@ export class CartService {
     return this.toView(cart?.items ?? []);
   }
 
-  async addItem(userId: string, dto: AddCartItemDto): Promise<CartView> {
+  /**
+   * `Idempotency-Key` opcional (a diferencia de `POST /orders`, acá no es obligatoria — carrito no
+   * es una operación de una sola vez). Sin key: comportamiento de siempre (increment). Con key:
+   * mismo lock-y-replay que `OrdersService.create` sobre la tabla `IdempotencyKey` — un retry con
+   * la misma key + mismo body devuelve la respuesta guardada en vez de sumar cantidad de nuevo.
+   */
+  async addItem(
+    userId: string,
+    dto: AddCartItemDto,
+    idempotencyKey?: string,
+  ): Promise<CartView> {
+    if (!idempotencyKey) {
+      return this.addItemUnchecked(userId, dto);
+    }
+
+    const requestHash = this.hashAddItemRequest(dto);
+    try {
+      await this.prisma.idempotencyKey.create({
+        data: { userId, key: idempotencyKey, requestHash, response: {} },
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        const existing = await this.prisma.idempotencyKey.findUnique({
+          where: { userId_key: { userId, key: idempotencyKey } },
+        });
+        if (!existing || existing.requestHash !== requestHash) {
+          throw new ConflictException({
+            error: 'Idempotency-Key ya usada con un body distinto',
+          });
+        }
+        if (this.isEmptyJson(existing.response)) {
+          throw new ConflictException({
+            error: 'Solicitud en curso con esta Idempotency-Key, reintentá',
+          });
+        }
+        return existing.response as unknown as CartView;
+      }
+      throw err;
+    }
+
+    try {
+      const view = await this.addItemUnchecked(userId, dto);
+      await this.prisma.idempotencyKey.update({
+        where: { userId_key: { userId, key: idempotencyKey } },
+        data: { response: view as unknown as Prisma.JsonObject },
+      });
+      return view;
+    } catch (err) {
+      await this.prisma.idempotencyKey
+        .delete({ where: { userId_key: { userId, key: idempotencyKey } } })
+        .catch(() => undefined);
+      throw err;
+    }
+  }
+
+  private async addItemUnchecked(
+    userId: string,
+    dto: AddCartItemDto,
+  ): Promise<CartView> {
     const variant = await this.resolveVariant(dto);
     const cart = await this.ensureCart(userId);
 
@@ -199,5 +262,25 @@ export class CartService {
     });
 
     return { items: views, itemCount, subtotal: subtotal.toFixed(2) };
+  }
+
+  private hashAddItemRequest(dto: AddCartItemDto): string {
+    const normalized = {
+      variantId: dto.variantId ?? null,
+      sku: dto.sku?.trim() ?? null,
+      quantity: dto.quantity,
+    };
+    return createHash('sha256')
+      .update(JSON.stringify(normalized))
+      .digest('hex');
+  }
+
+  private isEmptyJson(value: Prisma.JsonValue): boolean {
+    return (
+      value != null &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      Object.keys(value).length === 0
+    );
   }
 }

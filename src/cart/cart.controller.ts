@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
@@ -19,8 +20,9 @@ import { ApiTags } from '@nestjs/swagger';
 
 /**
  * Carrito persistido por usuario (plan E2E, hito M2). Todas las rutas requieren bearer.
- * `Idempotency-Key` opcional en `POST /cart/items` y `/cart/merge` — se acepta pero todavía no se
- * deduplica (la tabla `IdempotencyKey` llega en M5/B4).
+ * `Idempotency-Key` opcional en `POST /cart/items` — deduplica un retry ante un transport error
+ * (mismo lock-y-replay que `POST /orders`, ver `CartService.addItem`). A diferencia de `/orders`,
+ * acá NO es obligatoria: sin el header, se mantiene el comportamiento de siempre (increment).
  */
 @UseGuards(JwtAuthGuard)
 @ApiTags('cart')
@@ -34,8 +36,16 @@ export class CartController {
   }
 
   @Post('items')
-  addItem(@CurrentUser() user: JwtPayload, @Body() dto: AddCartItemDto) {
-    return this.cartService.addItem(user.sub, dto);
+  addItem(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: AddCartItemDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.cartService.addItem(
+      user.sub,
+      dto,
+      idempotencyKey?.trim() || undefined,
+    );
   }
 
   @Patch('items/:variantId')
