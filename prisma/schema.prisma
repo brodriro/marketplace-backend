@@ -206,11 +206,17 @@ model Order {
   id           String      @id @default(uuid())
   userId       String
   status          OrderStatus @default(pending_payment)
+  // `total` es el monto final (post-descuento) — el mismo que se cobra vía `payment.clientSecret`.
   total           Decimal     @db.Decimal(10, 2)
   shippingCity    String
   etaDays         Int
   trackingNumber  String?
   trackingCarrier String?
+  // Código validado contra `PromoCode` en `POST /orders` (ver `OrdersService.create`). Null si no
+  // se mandó `discountCode` o si no se pudo aplicar. `discountAmount` es lo que se restó de la
+  // suma de `unitPrice * quantity` para llegar a `total` — 0 si no hubo descuento.
+  discountCode    String?
+  discountAmount  Decimal     @default(0) @db.Decimal(10, 2)
   // PaymentIntent de Stripe asociado (plan E2E §6.5 / hito M5). Null si `PAYMENTS_ENABLED=false`
   // (el pedido se da por pagado al crearse). El `clientSecret` no se persiste: se devuelve sólo
   // en la respuesta de `POST /orders` y en el replay de idempotencia.
@@ -415,8 +421,9 @@ model Banner {
  * Códigos de descuento para la tool `apply_discount_code` del agente conversacional.
  * `appliesToCategory` guarda un `Category.id` pero NO es FK (mismo criterio que
  * `ProductVariant.color` frente a `Color`): no hay endpoint de escritura, solo `prisma/seed.ts`
- * puebla esta tabla y `GET /promo-codes/:code` es solo lectura/validación. El backend no aplica
- * el descuento en `POST /orders` — el total con descuento lo calcula el cliente.
+ * puebla esta tabla. `GET /promo-codes/:code` sigue siendo solo validación (preview antes de
+ * pagar); `POST /orders` además VALIDA y APLICA el código al `total` si viene `discountCode`
+ * (ver `OrdersService.create` / `applyDiscount`) — dejó de ser cálculo exclusivo del cliente.
  */
 model PromoCode {
   id                String        @id @default(uuid())

@@ -36,13 +36,20 @@ describe('ProductsService.search', () => {
     service.search({ q, pageSize: 20 } satisfies SearchProductsQueryDto);
 
   const ci = Prisma.QueryMode.insensitive;
+  // Espeja `ProductsService.colorStem` (fix de M6: "negra"/"rojo" deben matchear el mismo color
+  // que su contraparte de género — el color-clause compara por raíz, no por token literal).
+  const colorStem = (token: string) =>
+    token.length > 3 && /[aeo]$/i.test(token) ? token.slice(0, -1) : token;
   const tokenOr = (token: string) => ({
     OR: [
       { name: { contains: token, mode: ci } },
       { description: { contains: token, mode: ci } },
       {
         variants: {
-          some: { visible: true, color: { contains: token, mode: ci } },
+          some: {
+            visible: true,
+            color: { contains: colorStem(token), mode: ci },
+          },
         },
       },
     ],
@@ -62,6 +69,19 @@ describe('ProductsService.search', () => {
   it('colapsa espacios múltiples y bordes en un solo token', async () => {
     await run('  remera   ');
     expect(whereOf().AND).toEqual([tokenOr('remera')]);
+  });
+
+  it('el color matchea por raíz de género ("negra" encuentra variantes "Negro")', async () => {
+    await run('remera negra');
+    expect(whereOf().AND).toEqual(
+      ['remera', 'negra'].map((token) => tokenOr(token)),
+    );
+    // "negra" (5 chars, termina en vocal) se recorta a "negr" solo para el filtro de color.
+    const [, negraClause] = whereOf().AND as Prisma.ProductWhereInput[];
+    expect(
+      (negraClause as { OR: { variants: { some: { color: unknown } } }[] })
+        .OR[2].variants.some.color,
+    ).toEqual({ contains: 'negr', mode: ci });
   });
 
   it('sin `q` (o solo espacios) no agrega filtro de texto', async () => {

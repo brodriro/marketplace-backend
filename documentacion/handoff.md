@@ -8,6 +8,42 @@
 
 ---
 
+## 2026-09-11 (noche) · `discountCode` se aplica al `total` de `POST /orders` + stemming de color en `search`
+
+- **Qué:** dos follow-ups sin dueño que estaban en `tasks.md`, a pedido explícito del usuario:
+  1. `POST /orders` ahora valida `discountCode` contra `PromoCode` (`OrdersService.applyDiscount`,
+     mismo criterio 404 que `GET /promo-codes/:code`) y lo resta del `total` **antes** de crear el
+     pedido — dejó de ser "cálculo exclusivo del cliente" (así estaba documentado en
+     `schema.prisma`/`API.md`, y el usuario decidió explícitamente revertir esa decisión). Nuevas
+     columnas `Order.discountCode` / `Order.discountAmount` (migración
+     `20260912024636_order_discount_fields`, aplicada al RDS pre-prod). `minPurchase` se chequea
+     contra el subtotal completo (`409 { error, minPurchase }` si no alcanza); `appliesToCategory`
+     acota el descuento a la porción del subtotal de esa categoría; `fixed_amount` se clampea al
+     subtotal elegible (nunca deja `total` negativo). `discountCode` se normaliza a mayúsculas y
+     entra en el hash de `Idempotency-Key`.
+  2. `ProductsService.search`: el match de color ahora compara por raíz (`colorStem`), no por token
+     literal — `"remera negra"` no encontraba nada porque el adjetivo femenino no es substring de
+     `Negro` (catálogo es-419: Negro/Rojo cambian por género, Azul/Verde/Celeste no). Se recorta la
+     vocal final del token (si mide >3) solo para el filtro de color; no toca `name`/`description`.
+- **Por qué:** eran los dos últimos ítems del backlog de `tasks.md`, ambos "sin dueño" desde M5/M6.
+  El del descuento tenía una decisión de diseño documentada en contra ("el cliente calcula el
+  descuento") — se le mostró esa tensión al usuario antes de tocar el contrato, y pidió
+  implementarlo igual + avisarle a `agente` para que ajuste su lado.
+- **Archivos clave:** `prisma/schema.prisma` (columnas + comentario de `PromoCode` actualizado),
+  `prisma/migrations/20260912024636_order_discount_fields/`, `src/orders/orders.service.ts`
+  (`applyDiscount` + `create`), `src/orders/dto/create-order.dto.ts`,
+  `src/products/products.service.ts` (`colorStem`), specs de ambos servicios,
+  `documentacion/{API.md,CLAUDE.md,openapi.json}`.
+- **Verificado:** unit tests (`orders.service.spec.ts` +5 casos: percentage, fixed_amount clampeado,
+  `appliesToCategory`, `minPurchase` no alcanzado, código inválido/expirado; `products.service.spec.ts`
+  +2 casos de stemming) — 15/15 verde. Smoke-test en vivo contra `:3000`/RDS pre-prod: `WELCOME10`
+  (10 %) sobre un Teclado Gamer $89.99 → `total: "80.99"`, `discountAmount: "9"`; `EXPIRADO5` → `404`;
+  `ENVIOGRATIS` (minPurchase 100) sobre subtotal $89.99 → `409 { minPurchase: "100.00" }`.
+- **Follow-ups:** avisar a `agente` (pendiente al cerrar esta entrada) para que ajuste su tool
+  `apply_discount_code`/flujo de checkout a que el backend ya aplica el descuento — hoy el cliente
+  probablemente muestra su propio cálculo y podría duplicarlo o quedar desincronizado con el
+  `total` real del pedido.
+
 ## 2026-09-11 · `POST /cart/items` — soporte de `Idempotency-Key` (opcional)
 
 - **Qué:** `Idempotency-Key` opcional en `POST /cart/items`, mismo lock-y-replay que

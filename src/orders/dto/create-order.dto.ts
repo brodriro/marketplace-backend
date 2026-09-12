@@ -29,8 +29,9 @@ export class CreateOrderDto {
   items: CreateOrderItemDto[];
 
   /**
-   * Código de descuento (plan E2E §A2). Se acepta y entra en el hash de idempotencia; la
-   * aplicación al `total` es follow-up de la integración con `promo-codes` (fuera de B4).
+   * Código de descuento (plan E2E §A2). Se valida contra `PromoCode` y se aplica al `total`
+   * (ver `OrdersService.applyDiscount`) — `404` si no existe/expiró, `409` si no llega al
+   * `minPurchase`. Entra en el hash de idempotencia normalizado a mayúsculas.
    */
   @IsOptional()
   @IsString()

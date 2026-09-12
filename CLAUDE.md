@@ -108,6 +108,16 @@ with no `status` (or the same status) is still a tracking-only update — no tra
 or buyer) also fires an `order_status_changed` `Notification` for the order's user (best-effort —
 a notification failure is logged, never rethrown).
 
+**Discount codes (2026-09-11):** an optional `discountCode` in `POST /orders` is validated against
+`PromoCode` (`OrdersService.applyDiscount`, same 404-on-invalid-or-expired rule as
+`GET /promo-codes/:code`) and applied to `total` **inside** the transaction, before stock is
+decremented — this reversed the earlier "client computes the discounted total" design (still
+reflected in `GET /promo-codes/:code`, which stays preview-only/non-mutating). `minPurchase` is
+checked against the full subtotal (`409 { error, minPurchase }` if short); `appliesToCategory`
+scopes the discount to that category's share of the subtotal, clamping `fixed_amount` so `total`
+never goes negative. `discountCode` (normalized upper-case) and `discountAmount` are persisted on
+`Order` and both are part of the `Idempotency-Key` request hash.
+
 ### Payments — provider-agnostic (M5, `feat/e2e-m5-payments`, task B4)
 
 The backend is **not tied to Stripe**. `src/payments/payment-provider.ts` defines a

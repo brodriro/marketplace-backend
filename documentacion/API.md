@@ -484,6 +484,8 @@ no existe), `409` (el usuario ya dejó una reseña para este producto — 1 por 
   "etaDays": 5,
   "trackingNumber": "string | null",
   "trackingCarrier": "string | null",
+  "discountCode": "string | null",
+  "discountAmount": "0.00",
   "createdAt": "ISO-8601",
   "updatedAt": "ISO-8601",
   "items": [
@@ -537,18 +539,28 @@ Body:
 ```json
 {
   "shippingCity": "string",
-  "items": [ { "variantId": "uuid", "quantity": 1 } ]
+  "items": [ { "variantId": "uuid", "quantity": 1 } ],
+  "discountCode": "string opcional"
 }
 ```
 
 `items` no puede ser vacío. Crea la orden en estado `pending_payment`, descuenta stock de cada
-variante, calcula `total` a partir del `price` del producto en el momento de la compra y escribe
-la fila génesis de historial — todo en una única transacción de Prisma: si algún ítem no tiene
-stock suficiente, no se persiste nada.
+variante, calcula el subtotal a partir del `price` del producto en el momento de la compra y
+escribe la fila génesis de historial — todo en una única transacción de Prisma: si algún ítem no
+tiene stock suficiente, no se persiste nada.
+
+Si viene `discountCode`, se valida contra `PromoCode` (mismo criterio que
+`GET /promo-codes/:code`) y se aplica al subtotal **antes** de crear el pedido — `total` en la
+respuesta ya es el monto final (post-descuento; es lo que se cobra vía `payment.clientSecret`).
+`appliesToCategory` (si el código lo trae) acota el descuento a la porción del subtotal de ítems
+de esa categoría — nunca deja el `total` negativo (`fixed_amount` se clampea al subtotal elegible).
+`discountAmount` en la respuesta es lo restado; `discountCode` queda normalizado a mayúsculas.
+`Idempotency-Key` + mismo body (incluyendo `discountCode`) → replay de la respuesta guardada.
 
 `201`: el `Order` creado, misma forma que `GET /orders` (cada `item` con `variant: { color, sku }`,
 sin el `product` completo). Errores: `400` (validación del body, o stock insuficiente — mensaje
-`Stock insuficiente para <sku>`), `404` (algún `variantId` no existe).
+`Stock insuficiente para <sku>`), `404` (algún `variantId` no existe, o `discountCode` inválido/
+expirado), `409 { error, minPurchase }` (el subtotal no alcanza el `minPurchase` del código).
 
 ### `POST /orders/:id/cancel`  — M4
 
@@ -656,8 +668,9 @@ conversacional. `:code` se normaliza a mayúsculas en el lookup (`welcome10` == 
   `type: "fixed_amount"` → `value` es el monto a descontar, en la misma moneda que `price`.
 - `appliesToCategory` (si no es `null`) es un `Category.id` — el descuento aplica solo a ítems de
   esa categoría. `minPurchase` es el subtotal mínimo para que el código sea válido.
-- El backend **no** aplica el descuento en `POST /orders` (que no acepta `discountCode`) — este
-  endpoint es solo validación; el total con descuento lo calcula el cliente.
+- Este endpoint es de **preview**: valida el código sin tocar ningún pedido — usalo para mostrarle
+  el descuento al usuario antes de pagar. `POST /orders` (§ Orders) hace la validación real y
+  **aplica** el descuento al `total` cuando se manda `discountCode` en el body.
 
 Errores: `404` si el código no existe **o** si `now` está fuera de `[validFrom, validUntil]`
 (expirado o todavía no vigente) — ambos casos devuelven el mismo `404`.

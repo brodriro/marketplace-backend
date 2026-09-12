@@ -94,7 +94,12 @@ export class ProductsService {
                     some: {
                       visible: true,
                       color: {
-                        contains: token,
+                        // Stem de género: "remera negra" no matcheaba "Negro" porque el
+                        // adjetivo femenino no es substring del nombre masculino del color
+                        // (catálogo es-419: Negro/Rojo cambian por género, Azul/Verde/Celeste no).
+                        // Se pisa el vocal final del token para comparar por raíz en vez de
+                        // literal (M6 follow-up).
+                        contains: this.colorStem(token),
                         mode: Prisma.QueryMode.insensitive,
                       },
                     },
@@ -386,5 +391,12 @@ export class ProductsService {
       where: { id: variantId },
       data: { visible: false },
     });
+  }
+
+  /** "negra"/"negro", "roja"/"rojo" → misma raíz; deja intactos los invariables (azul/verde/celeste). */
+  private colorStem(token: string): string {
+    return token.length > 3 && /[aeo]$/i.test(token)
+      ? token.slice(0, -1)
+      : token;
   }
 }

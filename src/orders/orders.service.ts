@@ -12,6 +12,7 @@ import {
   OrderActorType,
   OrderStatus,
   Prisma,
+  PromoCodeType,
 } from '../generated/prisma/client';
 import type { AppConfig } from '../config/configuration';
 import { PrismaService } from '../prisma/prisma.service';
@@ -147,6 +148,7 @@ export class OrdersService {
           variantId: string;
           quantity: number;
           unitPrice: number;
+          categoryId: string;
         }[] = [];
         const insufficientStockSkus: string[] = [];
 
@@ -177,6 +179,7 @@ export class OrdersService {
             variantId: variant.id,
             quantity: item.quantity,
             unitPrice,
+            categoryId: variant.product.categoryId,
           });
         }
         if (insufficientStockSkus.length > 0) {
@@ -185,6 +188,14 @@ export class OrdersService {
             insufficientStockSkus,
           });
         }
+
+        // Descuento (plan E2E §A2): valida el código contra `PromoCode` y lo aplica al `total`
+        // antes de crear el pedido — ya no es un cálculo exclusivo del cliente (ver schema.prisma).
+        const trimmedCode = dto.discountCode?.trim();
+        const discount = trimmedCode
+          ? await this.applyDiscount(tx, trimmedCode, total, itemsData)
+          : null;
+        const finalTotal = discount ? total - discount.discountAmount : total;
 
         // Paso 2: descontar stock y crear el pedido.
         for (const item of itemsData) {
@@ -198,10 +209,18 @@ export class OrdersService {
           data: {
             userId,
             status: OrderStatus.pending_payment,
-            total,
+            total: finalTotal,
+            discountCode: discount?.discountCode ?? null,
+            discountAmount: discount?.discountAmount ?? 0,
             shippingCity: dto.shippingCity,
             etaDays: DEFAULT_ETA_DAYS,
-            items: { create: itemsData },
+            items: {
+              create: itemsData.map(({ variantId, quantity, unitPrice }) => ({
+                variantId,
+                quantity,
+                unitPrice,
+              })),
+            },
             statusHistory: {
               create: {
                 status: OrderStatus.pending_payment,
@@ -584,11 +603,57 @@ export class OrdersService {
     return stale.length;
   }
 
+  /**
+   * Valida `code` contra `PromoCode` (mismo criterio 404 que `PromoCodesService.validate`:
+   * "no existe" y "fuera de vigencia" son indistinguibles) y calcula el descuento a restar del
+   * `total`. `minPurchase` se chequea contra el subtotal completo del pedido; si `appliesToCategory`
+   * está seteado, el descuento (tanto `percentage` como `fixed_amount`) solo corre sobre la porción
+   * del subtotal de ítems de esa categoría — nunca deja el pedido en negativo.
+   */
+  private async applyDiscount(
+    tx: Prisma.TransactionClient,
+    code: string,
+    subtotal: number,
+    items: { unitPrice: number; quantity: number; categoryId: string }[],
+  ): Promise<{ discountCode: string; discountAmount: number }> {
+    const normalized = code.toUpperCase();
+    const promo = await tx.promoCode.findUnique({
+      where: { code: normalized },
+    });
+    const now = new Date();
+    if (!promo || now < promo.validFrom || now > promo.validUntil) {
+      throw new NotFoundException('Código de descuento inválido o expirado');
+    }
+
+    const minPurchase = promo.minPurchase.toNumber();
+    if (subtotal < minPurchase) {
+      throw new ConflictException({
+        error: 'El subtotal no alcanza el mínimo de compra del código de descuento',
+        minPurchase: minPurchase.toFixed(2),
+      });
+    }
+
+    const eligibleSubtotal = promo.appliesToCategory
+      ? items
+          .filter((i) => i.categoryId === promo.appliesToCategory)
+          .reduce((sum, i) => sum + i.unitPrice * i.quantity, 0)
+      : subtotal;
+
+    const rawDiscount =
+      promo.type === PromoCodeType.percentage
+        ? eligibleSubtotal * (promo.value.toNumber() / 100)
+        : promo.value.toNumber();
+    const discountAmount =
+      Math.round(Math.min(rawDiscount, eligibleSubtotal) * 100) / 100;
+
+    return { discountCode: promo.code, discountAmount };
+  }
+
   // ---------------------------------------------------------------------------
   private hashRequest(dto: CreateOrderDto): string {
     const normalized = {
       shippingCity: dto.shippingCity.trim(),
-      discountCode: dto.discountCode?.trim() ?? null,
+      discountCode: dto.discountCode?.trim().toUpperCase() ?? null,
       items: [...dto.items]
         .map((i) => ({ variantId: i.variantId, quantity: i.quantity }))
         .sort((a, b) => a.variantId.localeCompare(b.variantId)),

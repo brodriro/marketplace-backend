@@ -51,7 +51,8 @@ _(nada activo — ver "Retomar acá" y [`handoff.md`](handoff.md) para lo últim
   - Search por tokens sobre `name` / `description` / color de variante visible (PRs #4 + #8).
   - Datos es-419: migración `20260909180000_i18n_es419_catalog` (categorías + `store` +
     `colors.name` + `product_variants.color`) + `seed-data/feed.json` (PR #8). Aplicada al RDS
-    2026-09-10. _Follow-up_: `"remera negra"` (fem.) todavía necesita stemming para matchear.
+    2026-09-10. Stemming de género en el match de color (`"remera negra"` → `Negro`) cerrado
+    2026-09-11, ver `handoff.md`.
 - **M7 · B6 · Admin polish.** ✅ `master` (PR #8). `GET /admin/analytics` (+`/low-stock`),
   `/admin/monitor/{notifications,stock-alerts}`, `/admin/agent-config`; páginas Next.js. Sesión
   admin **dual-mode**: Bearer + cookie httpOnly + CSRF double-submit (`AdminCsrfGuard` `APP_GUARD`).
@@ -76,5 +77,3 @@ _(nada activo — ver "Retomar acá" y [`handoff.md`](handoff.md) para lo últim
 
 - Cliente Android: el fallback de `GET /me` (§16) no se auto-recupera tras un fallo transitorio.
   Tarea de `demoCompose`, referencia cruzada.
-- `discountCode` en `POST /orders` se acepta y hashea pero **no se aplica al `total`** (integración
-  con `promo-codes` = follow-up sin dueño).
