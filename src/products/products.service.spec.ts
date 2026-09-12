@@ -44,6 +44,8 @@ describe('ProductsService.search', () => {
     OR: [
       { name: { contains: token, mode: ci } },
       { description: { contains: token, mode: ci } },
+      { store: { contains: token, mode: ci } },
+      { category: { name: { contains: token, mode: ci } } },
       {
         variants: {
           some: {
@@ -55,7 +57,7 @@ describe('ProductsService.search', () => {
     ],
   });
 
-  it('parte `q` en tokens y exige cada uno en name OR description OR color de variante', async () => {
+  it('parte `q` en tokens y exige cada uno en name OR description OR store OR categoría OR color de variante', async () => {
     await run('mochila viajera cuero');
 
     const where = whereOf();
@@ -80,8 +82,21 @@ describe('ProductsService.search', () => {
     const [, negraClause] = whereOf().AND as Prisma.ProductWhereInput[];
     expect(
       (negraClause as { OR: { variants: { some: { color: unknown } } }[] })
-        .OR[2].variants.some.color,
+        .OR[4].variants.some.color,
     ).toEqual({ contains: 'negr', mode: ci });
+  });
+
+  it('cada token también matchea `store` o el nombre de la categoría (gap 2026-09-12)', async () => {
+    await run('nike');
+    const where = whereOf();
+    expect(where.AND).toEqual([tokenOr('nike')]);
+    const [clause] = where.AND as Prisma.ProductWhereInput[];
+    expect((clause as { OR: unknown[] }).OR).toContainEqual({
+      store: { contains: 'nike', mode: ci },
+    });
+    expect((clause as { OR: unknown[] }).OR).toContainEqual({
+      category: { name: { contains: 'nike', mode: ci } },
+    });
   });
 
   it('sin `q` (o solo espacios) no agrega filtro de texto', async () => {

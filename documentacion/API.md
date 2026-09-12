@@ -384,7 +384,7 @@ Todos los query params son opcionales:
 
 | Param | Tipo | Notas |
 |---|---|---|
-| `q` | string | busca en `name` (contains, case-insensitive) |
+| `q` | string | tokeniza por palabras; cada token debe aparecer (contains, case-insensitive) en `name`, `description`, `store`, nombre de categoría, o el color de alguna variante visible (color matchea por raíz de género: "negra" encuentra "Negro") |
 | `category` | string (uuid) | filtra por `categoryId` exacto |
 | `minPrice` / `maxPrice` | number | filtro de rango sobre `price` |
 | `color` | string | producto tiene al menos una variante con ese color |

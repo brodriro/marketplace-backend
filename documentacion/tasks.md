@@ -32,6 +32,9 @@ M0→M8 code-complete en `origin/master @ 0213307` (PR #10 = cutover a `/v1` pur
   `agente` que salieron de eso (`code: "invalid_discount_code"` estructurado en el 404, y
   `PATCH /cart` para persistir `discountCode` entre turnos de checkout). `agente` y `mobile` ya
   confirmaron sus lados. Detalle completo en [`handoff.md`](handoff.md) (4 entradas).
+- **Bonus cerrado 2026-09-12:** `GET /products/search` ahora también matchea `store` y nombre de
+  categoría por token (gap detectado ese mismo día, ver Notas — no relacionado con el reporte de
+  `agente` que resultó falsa alarma). Ver `handoff.md`.
 
 ## doing
 
@@ -78,10 +81,6 @@ _(nada activo — ver "Retomar acá" y [`handoff.md`](handoff.md) para lo últim
 - **Job de limpieza de usuarios throwaway (opción B).** `agent+<contextId>@agent.brodriro.dev`
   por sesión A2A, de antes de M1/A4 (ver corrección en `reference/handoff-integracion-agente.md`);
   nada los borra. Sin dueño.
-- **`GET /products/search` no matchea `store` ni nombre de categoría** (solo `name` / `description`
-  / color de variante — ver M6 arriba). Detectado 2026-09-12 chequeando un reporte de `agente` que
-  resultó ser otra cosa (ver Notas); no bloquea nada (`agente` tiene RC1 como red de seguridad para
-  "no encontré nada"). Sin dueño ni caso concreto que lo dispare todavía.
 
 ## Notas
 

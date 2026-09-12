@@ -8,6 +8,24 @@
 
 ---
 
+## 2026-09-12 (2) · `GET /products/search` también matchea `store` y nombre de categoría
+
+- **Qué:** `ProductsService.search` sumó dos claves más al `OR` por token (junto a `name`,
+  `description` y color de variante): `store` (contains, case-insensitive) y `category.name`
+  (contains, case-insensitive vía relación). Un query como "nike" o "electrónica" ahora encuentra
+  productos aunque esas palabras no estén en `name`/`description`.
+- **Por qué:** gap detectado el mismo día revisando (y descartando) un reporte no relacionado de
+  `agente` — el pedido real del usuario fue pedirlo explícitamente. `search` cubría `name` +
+  `description` + color desde M6, pero nunca `store`/categoría, aunque son campos visibles y
+  buscables desde la UI/agente.
+- **Archivos clave:** `src/products/products.service.ts` (`search`), `src/products/products.service.spec.ts`
+  (helper `tokenOr` + caso nuevo), `documentacion/API.md` (fila `q` de `GET /products/search`).
+- **Verificado:** unit tests — 7/7 verde en `products.service.spec.ts` (suite completa 21/21).
+  No requirió migración (campos existentes).
+- **Coordinación cross-repo:** avisado a `mobile` y `agente` del cierre; `agente` había preguntado si
+  lo tomaba acá o lo mitigaba de su lado (client-side filtering) — se le confirmó que queda resuelto
+  en el endpoint, sin acción necesaria de su parte.
+
 ## 2026-09-12 · `PATCH /cart` — persistir `discountCode` a nivel carrito
 
 - **Qué:** `Cart.discountCode String?` (migración `20260912033508_cart_discount_code`, aplicada

@@ -69,9 +69,11 @@ export class ProductsService {
       query;
 
     // Búsqueda por tokens: se parte `q` en palabras y cada una tiene que aparecer (insensible a
-    // mayúsculas/acentos según collation) en `name`, `description` **o** el color de alguna
-    // variante visible. Antes solo matcheaba la frase completa contra `name` — "mochila viajera
-    // cuero" o "remera negro" no encontraban nada (plan E2E M6 / RC1; catálogo ya en es-419).
+    // mayúsculas/acentos según collation) en `name`, `description`, `store`, nombre de categoría,
+    // **o** el color de alguna variante visible. Antes solo matcheaba la frase completa contra
+    // `name` — "mochila viajera cuero" o "remera negro" no encontraban nada (plan E2E M6 / RC1;
+    // catálogo ya en es-419). `store`/categoría se sumaron 2026-09-12 (gap detectado post-M6:
+    // buscar por tienda o categoría no encontraba nada aunque el producto existiera).
     const tokens = q?.trim().split(/\s+/).filter(Boolean) ?? [];
 
     const where: Prisma.ProductWhereInput = {
@@ -87,6 +89,20 @@ export class ProductsService {
                   description: {
                     contains: token,
                     mode: Prisma.QueryMode.insensitive,
+                  },
+                },
+                {
+                  store: {
+                    contains: token,
+                    mode: Prisma.QueryMode.insensitive,
+                  },
+                },
+                {
+                  category: {
+                    name: {
+                      contains: token,
+                      mode: Prisma.QueryMode.insensitive,
+                    },
                   },
                 },
                 {
