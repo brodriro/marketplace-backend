@@ -20,7 +20,12 @@ export class PromoCodesService {
 
     const now = new Date();
     if (!promo || now < promo.validFrom || now > promo.validUntil) {
-      throw new NotFoundException('Código de descuento inválido o expirado');
+      // Mismo shape que el 404 de `OrdersService.applyDiscount` (campo `code` estructurado en
+      // vez de solo texto) para que ambos endpoints sean distinguibles del mismo modo.
+      throw new NotFoundException({
+        error: 'Código de descuento inválido o expirado',
+        code: 'invalid_discount_code',
+      });
     }
 
     return {

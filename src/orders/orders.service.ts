@@ -622,7 +622,13 @@ export class OrdersService {
     });
     const now = new Date();
     if (!promo || now < promo.validFrom || now > promo.validUntil) {
-      throw new NotFoundException('Código de descuento inválido o expirado');
+      // Objeto en vez de string: shape distinta (sin `statusCode`/`message`) del 404 default de
+      // "variante no encontrada" más arriba, para que un consumidor no tenga que matchear el
+      // string del mensaje para distinguir los dos casos (pedido de @agente, 2026-09-12).
+      throw new NotFoundException({
+        error: 'Código de descuento inválido o expirado',
+        code: 'invalid_discount_code',
+      });
     }
 
     const minPurchase = promo.minPurchase.toNumber();

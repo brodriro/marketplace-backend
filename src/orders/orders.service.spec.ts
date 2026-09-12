@@ -291,6 +291,10 @@ describe('OrdersService.create — idempotencia + stock (§6.5)', () => {
         .catch((e: unknown) => e);
 
       expect(err).toBeInstanceOf(NotFoundException);
+      expect((err as NotFoundException).getResponse()).toEqual({
+        error: 'Código de descuento inválido o expirado',
+        code: 'invalid_discount_code',
+      });
       expect(tx.order.create).not.toHaveBeenCalled();
     });
   });

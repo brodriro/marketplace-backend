@@ -39,10 +39,17 @@
   +2 casos de stemming) — 15/15 verde. Smoke-test en vivo contra `:3000`/RDS pre-prod: `WELCOME10`
   (10 %) sobre un Teclado Gamer $89.99 → `total: "80.99"`, `discountAmount: "9"`; `EXPIRADO5` → `404`;
   `ENVIOGRATIS` (minPurchase 100) sobre subtotal $89.99 → `409 { minPurchase: "100.00" }`.
-- **Follow-ups:** avisar a `agente` (pendiente al cerrar esta entrada) para que ajuste su tool
-  `apply_discount_code`/flujo de checkout a que el backend ya aplica el descuento — hoy el cliente
-  probablemente muestra su propio cálculo y podría duplicarlo o quedar desincronizado con el
-  `total` real del pedido.
+- **Coordinación cross-repo (cerrada la misma noche):** avisado `agente`, que ajustó
+  `CheckoutUseCase`/`HttpOrderRepository` (su `master @ e8aa69d`) para mandar `discountCode` y usar
+  `discountAmount`/`total` de la respuesta en vez de recalcular; `mobile` confirmó que sus 2
+  refactors del día (DTO `String→Double`, limpieza de `ensureAuthenticated()`) no tocan checkout y
+  que Gson ignora los campos nuevos sin romper nada (sin UI para descuento todavía, no bloqueante).
+  A pedido de `agente`, se agregó `code: "invalid_discount_code"` al `404` de `discountCode`
+  inválido/expirado (en `POST /orders` **y** `GET /promo-codes/:code`, mismo shape en los dos) para
+  que no dependan de matchear el string del mensaje contra el `404` genérico de "variante no
+  encontrada". Verificado en vivo post-cambio (`:3000` en watch mode, recompiló solo).
+- **Follow-up sin dueño:** `agente` reservó `apply_discount_code` pero nunca lo "wireó" a un tool
+  real — queda dormido hasta que lo hagan (tarea de ellos, no bloqueante).
 
 ## 2026-09-11 · `POST /cart/items` — soporte de `Idempotency-Key` (opcional)
 

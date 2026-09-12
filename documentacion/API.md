@@ -559,8 +559,10 @@ de esa categoría — nunca deja el `total` negativo (`fixed_amount` se clampea 
 
 `201`: el `Order` creado, misma forma que `GET /orders` (cada `item` con `variant: { color, sku }`,
 sin el `product` completo). Errores: `400` (validación del body, o stock insuficiente — mensaje
-`Stock insuficiente para <sku>`), `404` (algún `variantId` no existe, o `discountCode` inválido/
-expirado), `409 { error, minPurchase }` (el subtotal no alcanza el `minPurchase` del código).
+`Stock insuficiente para <sku>`); `404` genérico `{ statusCode, message, error }` si algún
+`variantId` no existe, **o** `404 { error, code: "invalid_discount_code" }` (shape distinta, ver
+§ Promo codes) si `discountCode` es inválido/expiró; `409 { error, minPurchase }` si el subtotal no
+alcanza el `minPurchase` del código.
 
 ### `POST /orders/:id/cancel`  — M4
 
@@ -672,8 +674,12 @@ conversacional. `:code` se normaliza a mayúsculas en el lookup (`welcome10` == 
   el descuento al usuario antes de pagar. `POST /orders` (§ Orders) hace la validación real y
   **aplica** el descuento al `total` cuando se manda `discountCode` en el body.
 
-Errores: `404` si el código no existe **o** si `now` está fuera de `[validFrom, validUntil]`
-(expirado o todavía no vigente) — ambos casos devuelven el mismo `404`.
+Errores: `404 { error, code: "invalid_discount_code" }` si el código no existe **o** si `now` está
+fuera de `[validFrom, validUntil]` (expirado o todavía no vigente) — ambos casos devuelven el mismo
+`404`. El campo `code` (no confundir con el código del promo) es lo que distingue este error del
+`404` genérico de Nest (`{ statusCode, message, error }`) que devuelven otros endpoints — pensado
+para que un consumidor no tenga que matchear el string de `error` (pedido de integración, 2026-09-12).
+`POST /orders` usa el mismo shape cuando `discountCode` es inválido.
 
 Códigos sembrados por `prisma/seed.ts`: `WELCOME10` (10 % global), `ENVIOGRATIS`
 (`fixed_amount` 15, `minPurchase` 100), `CATEGORIA20` (20 % acotado a una categoría,
