@@ -78,7 +78,18 @@ _(nada activo — ver "Retomar acá" y [`handoff.md`](handoff.md) para lo últim
 - **Job de limpieza de usuarios throwaway (opción B).** `agent+<contextId>@agent.brodriro.dev`
   por sesión A2A, de antes de M1/A4 (ver corrección en `reference/handoff-integracion-agente.md`);
   nada los borra. Sin dueño.
+- **`GET /products/search` no matchea `store` ni nombre de categoría** (solo `name` / `description`
+  / color de variante — ver M6 arriba). Detectado 2026-09-12 chequeando un reporte de `agente` que
+  resultó ser otra cosa (ver Notas); no bloquea nada (`agente` tiene RC1 como red de seguridad para
+  "no encontré nada"). Sin dueño ni caso concreto que lo dispare todavía.
+
 ## Notas
 
 - Cliente Android: el fallback de `GET /me` (§16) no se auto-recupera tras un fallo transitorio.
   Tarea de `demoCompose`, referencia cruzada.
+- **2026-09-12 · falsa alarma de `agente`:** reportaron 2 pendientes ("nuestro" lado) que resultaron
+  ser su propio `tasks.md` desactualizado, no gaps reales: (1) el search ya matchea `description`
+  desde M6 (verificado en vivo: "mecánico" → encuentra "Teclado Gamer" por su descripción), y (2) el
+  `e2eRunId` en `AuditLog` para `PATCH /admin/orders/:id/status` es M3, cerrado 2026-09-09. `agente`
+  confirmó y corrigió su lado (`master @ 6fb0897`). Sin acción de nuestro lado más allá del ítem de
+  `store`/categoría de arriba, que sí es real pero no relacionado con lo que reportaron.
