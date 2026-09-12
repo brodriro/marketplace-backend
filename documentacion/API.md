@@ -63,10 +63,13 @@ controller, no un alias temporal).
 
 Fuente de verdad única para app y agente. Modelos `Cart` (1:1 usuario) + `CartItem`
 (`@@unique([cartId, variantId])`). `GET /cart` sin ítems → `200 { items: [], itemCount: 0,
-subtotal: "0.00" }` (no `404`). `Idempotency-Key` se acepta pero todavía no deduplica (M5). El
-carrito **no** valida stock (eso es `POST /orders`). `GET /cart` omite las líneas cuya
-variante/producto quedó `visible:false` (soft-deleted); `POST /cart/items` y `/cart/merge` con una
-variante `visible:false` → `404`.
+subtotal: "0.00" }` (no `404`). `POST /cart/items` acepta `Idempotency-Key` opcional (2026-09-11) —
+mismo lock-y-replay que `POST /orders` sobre la tabla `IdempotencyKey`: misma key + mismo body →
+replay de la respuesta guardada (no duplica cantidad ante un retry); misma key + body distinto →
+`409`; sin header → comportamiento de siempre (`increment`). A diferencia de `/orders`, acá **no**
+es obligatoria. El carrito **no** valida stock (eso es `POST /orders`). `GET /cart` omite las
+líneas cuya variante/producto quedó `visible:false` (soft-deleted); `POST /cart/items` y
+`/cart/merge` con una variante `visible:false` → `404`.
 
 | Método | Ruta | Notas |
 |---|---|---|

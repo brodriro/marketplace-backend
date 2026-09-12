@@ -384,7 +384,16 @@
     "/cart/items": {
       "post": {
         "operationId": "CartController_addItem",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
